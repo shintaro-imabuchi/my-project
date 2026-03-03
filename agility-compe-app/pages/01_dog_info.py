@@ -39,17 +39,24 @@ def show_add_form(user_id: str, current_count: int) -> None:
         st.warning(f"登録できる犬は最大 {MAX_DOGS} 頭までです。")
         return
 
-    with st.form("add_dog_form"):
+    form_v: int = st.session_state.get("dog_form_v", 0)
+    with st.form(f"add_dog_form_{form_v}"):
         dog_name = st.text_input("犬名 *")
         breed = st.text_input("犬種 *")
         dog_class = st.selectbox("クラス *", CLASSES)
-        events = st.multiselect("参加種目 *", EVENTS)
+        st.markdown("**参加種目 *** （1つ以上選択）")
+        col1, col2 = st.columns(2)
+        checked: dict[str, bool] = {}
+        for i, event in enumerate(EVENTS):
+            with col1 if i % 2 == 0 else col2:
+                checked[event] = st.checkbox(event)
         submitted = st.form_submit_button(
             "登録する", type="primary", use_container_width=True
         )
 
     if submitted:
-        if not dog_name or not breed or not events:
+        selected_events = [e for e, v in checked.items() if v]
+        if not dog_name or not breed or not selected_events:
             st.error("犬名・犬種・参加種目は必須です。")
             return
         get_supabase().table("dogs").insert(
@@ -58,9 +65,10 @@ def show_add_form(user_id: str, current_count: int) -> None:
                 "dog_name": dog_name,
                 "breed": breed,
                 "dog_class": dog_class,
-                "events": events,
+                "events": selected_events,
             }
         ).execute()
+        st.session_state["dog_form_v"] = form_v + 1
         st.session_state["flash"] = f"「{dog_name}」を登録しました。"
         st.rerun()
 
