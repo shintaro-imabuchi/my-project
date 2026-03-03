@@ -104,7 +104,8 @@ def show_home() -> None:
     st.subheader("参加登録システム")
     st.success(f"ようこそ、{name} さん！")
 
-    st.button("犬情報の登録・変更・削除", type="primary", use_container_width=True)
+    if st.button("犬情報の登録・変更・削除", type="primary", use_container_width=True):
+        st.switch_page("pages/01_dog_info.py")
 
     st.divider()
     if st.button("ログアウト", use_container_width=True):
