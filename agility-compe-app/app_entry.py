@@ -113,6 +113,9 @@ def show_home() -> None:
     if st.button("犬情報の登録・変更・削除", type="primary", use_container_width=True):
         st.switch_page("pages/01_dog_info.py")
 
+    if st.button("申し込み状況を見る", use_container_width=True):
+        st.switch_page("pages/02_registration_status.py")
+
     st.link_button(
         "練習会実施のご案内を見る",
         url="https://drive.google.com/file/d/1dVK-AFDItP7RHFZ7QnN3nkHVNIkK-6iD/view?usp=drive_link",
