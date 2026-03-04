@@ -17,6 +17,12 @@ def show_top() -> None:
         st.session_state["mode"] = "register"
         st.rerun()
 
+    st.link_button(
+        "練習会要綱を見る",
+        url="https://drive.google.com/file/d/1dVK-AFDItP7RHFZ7QnN3nkHVNIkK-6iD/view?usp=drive_link",
+        use_container_width=True,
+    )
+
 
 def show_login_form() -> None:
     """ログインフォームを表示する。"""
@@ -106,6 +112,12 @@ def show_home() -> None:
 
     if st.button("犬情報の登録・変更・削除", type="primary", use_container_width=True):
         st.switch_page("pages/01_dog_info.py")
+
+    st.link_button(
+        "練習会実施のご案内を見る",
+        url="https://drive.google.com/file/d/1dVK-AFDItP7RHFZ7QnN3nkHVNIkK-6iD/view?usp=drive_link",
+        use_container_width=True,
+    )
 
     st.info(
         "参加をキャンセルされる場合は、次のメールアドレスまでキャンセルの連絡をお願いします。\n\n"
