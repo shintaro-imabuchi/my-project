@@ -49,7 +49,7 @@ def main() -> None:
         st.switch_page("app_entry.py")
         return
 
-    st.subheader("【申し込み状況】")
+    st.subheader("申し込み状況")
 
     with st.spinner("集計中..."):
         summary = fetch_summary()
