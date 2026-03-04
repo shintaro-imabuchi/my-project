@@ -39,7 +39,7 @@ def show_summary(summary: dict) -> None:
 def main() -> None:
     """申し込み状況ページのメインエントリーポイント。"""
     st.set_page_config(
-        page_title="申し込み状況 | アジリティ練習会",
+        page_title="申し込み状況 | アジリティー練習会",
         layout="centered",
         initial_sidebar_state="collapsed",
     )
@@ -49,7 +49,7 @@ def main() -> None:
         st.switch_page("app_entry.py")
         return
 
-    st.header("【申し込み状況】")
+    st.subheader("【申し込み状況】")
 
     with st.spinner("集計中..."):
         summary = fetch_summary()

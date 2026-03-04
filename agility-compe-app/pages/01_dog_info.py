@@ -136,7 +136,7 @@ def show_add_form(user_id: str, current_count: int) -> None:
 def main() -> None:
     """犬情報ページのメインエントリーポイント。"""
     st.set_page_config(
-        page_title="犬情報 | アジリティ練習会",
+        page_title="犬情報 | アジリティー練習会",
         layout="centered",
         initial_sidebar_state="collapsed",
     )
@@ -152,7 +152,7 @@ def main() -> None:
     user = st.session_state["user"]
     user_id: str = user.id
 
-    st.header("【犬情報の登録・確認】")
+    st.subheader("【犬情報の登録・確認】")
 
     dogs = get_dogs(user_id)
     st.caption(f"登録済み: {len(dogs)} 頭 / 最大 {MAX_DOGS} 頭")
