@@ -152,7 +152,7 @@ def main() -> None:
     user = st.session_state["user"]
     user_id: str = user.id
 
-    st.title("犬情報の登録・確認")
+    st.header("【犬情報の登録・確認】")
 
     dogs = get_dogs(user_id)
     st.caption(f"登録済み: {len(dogs)} 頭 / 最大 {MAX_DOGS} 頭")
