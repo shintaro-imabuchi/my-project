@@ -136,7 +136,7 @@ def show_add_form(user_id: str, current_count: int) -> None:
 def main() -> None:
     """犬情報ページのメインエントリーポイント。"""
     st.set_page_config(
-        page_title="犬情報 | アジリティー競技会",
+        page_title="犬情報 | アジリティ練習会",
         layout="centered",
         initial_sidebar_state="collapsed",
     )

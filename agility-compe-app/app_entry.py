@@ -6,7 +6,7 @@ from supabase_client import get_supabase
 
 def show_top() -> None:
     """トップ画面（ログイン/新規登録ボタン）を表示する。"""
-    st.header("【アジリティー競技会】")
+    st.header("【アジリティ練習会】")
     st.subheader("参加登録システム")
 
     if st.button("ログイン", type="primary", use_container_width=True):
@@ -106,7 +106,7 @@ def show_home() -> None:
     user = st.session_state["user"]
     name: str = user.user_metadata.get("name", "")
 
-    st.header("【アジリティー競技会】")
+    st.header("【アジリティ練習会】")
     st.subheader("参加登録システム")
     st.success(f"ようこそ、{name} さん！")
 
@@ -137,7 +137,7 @@ def show_home() -> None:
 def main() -> None:
     """参加登録アプリのメインエントリーポイント。"""
     st.set_page_config(
-        page_title="参加登録 | アジリティー競技会",
+        page_title="参加登録 | アジリティ練習会",
         layout="centered",
         initial_sidebar_state="collapsed",
     )

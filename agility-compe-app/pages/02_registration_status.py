@@ -39,7 +39,7 @@ def show_summary(summary: dict) -> None:
 def main() -> None:
     """申し込み状況ページのメインエントリーポイント。"""
     st.set_page_config(
-        page_title="申し込み状況 | アジリティー競技会",
+        page_title="申し込み状況 | アジリティ練習会",
         layout="centered",
         initial_sidebar_state="collapsed",
     )
