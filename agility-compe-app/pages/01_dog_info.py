@@ -50,7 +50,7 @@ def show_edit_form(dog: dict) -> None:
         dog_name = st.text_input("犬名 *", value=dog["dog_name"])
         breed = st.text_input("犬種 *", value=dog["breed"])
         class_idx = CLASSES.index(dog["dog_class"]) if dog["dog_class"] in CLASSES else 0
-        dog_class = st.selectbox("クラス *", CLASSES, index=class_idx)
+        dog_class = st.radio("クラス *", CLASSES, index=class_idx, horizontal=True)
         st.markdown("**参加種目 *** （1つ以上選択）")
         col1, col2 = st.columns(2)
         checked: dict[str, bool] = {}
@@ -107,7 +107,7 @@ def show_add_form(user_id: str, current_count: int) -> None:
     with st.form(f"add_dog_form_{form_v}"):
         dog_name = st.text_input("犬名 *")
         breed = st.text_input("犬種 *")
-        dog_class = st.selectbox("クラス *", CLASSES)
+        dog_class = st.radio("クラス *", CLASSES, horizontal=True)
         st.markdown("**参加種目 *** （1つ以上選択）")
         col1, col2 = st.columns(2)
         checked: dict[str, bool] = {}
