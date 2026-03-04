@@ -107,6 +107,11 @@ def show_home() -> None:
     if st.button("犬情報の登録・変更・削除", type="primary", use_container_width=True):
         st.switch_page("pages/01_dog_info.py")
 
+    st.info(
+        "参加をキャンセルされる場合は、次のメールアドレスまでキャンセルの連絡をお願いします。\n\n"
+        "compe@puffin.tokyo.jp"
+    )
+
     st.divider()
     if st.button("ログアウト", use_container_width=True):
         get_supabase().auth.sign_out()
