@@ -2,6 +2,7 @@ import streamlit as st
 from supabase_auth.errors import AuthApiError
 
 from supabase_client import get_supabase
+from utils.settings import get_registration_open
 
 
 def show_top() -> None:
@@ -13,9 +14,13 @@ def show_top() -> None:
         st.session_state["mode"] = "login"
         st.rerun()
 
-    if st.button("新規登録", use_container_width=True):
-        st.session_state["mode"] = "register"
-        st.rerun()
+    if get_registration_open():
+        if st.button("新規登録", use_container_width=True):
+            st.session_state["mode"] = "register"
+            st.rerun()
+    else:
+        st.warning("新規登録を締め切りました")
+        st.button("新規登録", use_container_width=True, disabled=True)
 
     st.link_button(
         "練習会要綱を見る",
@@ -147,7 +152,11 @@ def main() -> None:
     elif st.session_state.get("mode") == "login":
         show_login_form()
     elif st.session_state.get("mode") == "register":
-        show_register_form()
+        if get_registration_open():
+            show_register_form()
+        else:
+            st.session_state["mode"] = None
+            st.rerun()
     else:
         show_top()
 
