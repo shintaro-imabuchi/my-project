@@ -33,6 +33,7 @@ def show_summary(summary: dict) -> None:
         {"種目": event, "頭数": event_counts.get(event, 0)}
         for event in EVENTS
     ]
+    rows.append({"種目": "合計", "頭数": sum(r["頭数"] for r in rows)})
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
