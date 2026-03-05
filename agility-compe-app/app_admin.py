@@ -234,6 +234,7 @@ def _build_results_workbook(
         cell.alignment = Alignment(horizontal="center")
 
     # データ行（下線付き）
+    _TIME_COLS = {6, 10}  # タイム列・合計タイム列（1-indexed）
     for i, p in enumerate(data):
         row_num = _ROW_DATA_START + i
         row_vals = [
@@ -243,6 +244,8 @@ def _build_results_workbook(
         for col_idx, val in enumerate(row_vals, start=1):
             cell = ws.cell(row=row_num, column=col_idx, value=val)
             cell.border = bottom_border
+            if col_idx in _TIME_COLS:
+                cell.number_format = "0.00"
 
     # 列幅調整
     col_values_list = [
@@ -347,11 +350,11 @@ def process_results_excel(file_bytes: bytes) -> bytes:
 
     # グループ分けと並び替え
     group1 = sorted(
-        [p for p in raw if p["time"] > 0 and p["fail"] == 0 and p["refuse"] == 0],
+        [p for p in raw if p["time"] > 0 and p["deduct"] == 0],
         key=lambda p: p["total_time"],
     )
     group2 = sorted(
-        [p for p in raw if p["time"] > 0 and (p["fail"] > 0 or p["refuse"] > 0)],
+        [p for p in raw if p["time"] > 0 and p["deduct"] > 0],
         key=lambda p: p["total_time"],
     )
     group3 = [p for p in raw if p["time"] == 0]
