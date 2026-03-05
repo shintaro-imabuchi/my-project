@@ -1,3 +1,4 @@
 streamlit
 supabase
 supabase_auth
+openpyxl
