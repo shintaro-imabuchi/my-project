@@ -27,7 +27,7 @@ _ROW_LIMIT_TIME = 5
 _ROW_TURNING_SPEED = 6
 _ROW_HEADER = 8
 _ROW_DATA_START = 9
-_RESULT_COLS = ["順位", "氏名", "犬名", "犬種", "クラス", "タイム", "失敗", "拒絶", "減点", "合計タイム"]
+_RESULT_COLS = ["順位", "氏名", "犬名", "犬種", "クラス", "タイム", "失敗", "拒絶", "減点", "スピード", "合計タイム"]
 
 
 def calc_fee(events: list[str]) -> int:
@@ -234,12 +234,12 @@ def _build_results_workbook(
         cell.alignment = Alignment(horizontal="center")
 
     # データ行（下線付き）
-    _TIME_COLS = {6, 10}  # タイム列・合計タイム列（1-indexed）
+    _TIME_COLS = {6, 10, 11}  # タイム列・スピード列・合計タイム列（1-indexed）
     for i, p in enumerate(data):
         row_num = _ROW_DATA_START + i
         row_vals = [
             p["rank"], p["user_name"], p["dog_name"], p["breed"], p["dog_class"],
-            p["time"], p["fail"], p["refuse"], p["deduct"], p["total_time"],
+            p["time"], p["fail"], p["refuse"], p["deduct"], p["speed"], p["total_time"],
         ]
         for col_idx, val in enumerate(row_vals, start=1):
             cell = ws.cell(row=row_num, column=col_idx, value=val)
@@ -258,6 +258,7 @@ def _build_results_workbook(
         [str(p["fail"]) for p in data],
         [str(p["refuse"]) for p in data],
         [str(p["deduct"]) for p in data],
+        [str(p["speed"]) for p in data],
         [str(p["total_time"]) for p in data],
     ]
     for col_idx, (col_name, values) in enumerate(zip(_RESULT_COLS, col_values_list), start=1):
@@ -296,7 +297,7 @@ def generate_results_skeleton_zip(participants: list[dict]) -> bytes | None:
                     {
                         "rank": "", "user_name": p["user_name"], "dog_name": p["dog_name"],
                         "breed": p["breed"], "dog_class": p["dog_class"],
-                        "time": 0, "fail": 0, "refuse": 0, "deduct": 0, "total_time": 0,
+                        "time": 0, "fail": 0, "refuse": 0, "deduct": 0, "speed": 0.00, "total_time": 0,
                     }
                     for p in rows
                 ]
@@ -333,6 +334,7 @@ def process_results_excel(file_bytes: bytes) -> bytes:
         fail_val = int(ws.cell(row=row_num, column=7).value or 0)
         refuse_val = int(ws.cell(row=row_num, column=8).value or 0)
         deduct = (fail_val + refuse_val) * 5 + max(0, int(time_val - std_time))
+        speed = round(course_len / time_val, 2) if time_val > 0 else 0.00
         total_time = round(time_val + deduct, 2)
         raw.append({
             "rank": "",
@@ -344,6 +346,7 @@ def process_results_excel(file_bytes: bytes) -> bytes:
             "fail": fail_val,
             "refuse": refuse_val,
             "deduct": deduct,
+            "speed": speed,
             "total_time": total_time,
         })
         row_num += 1
