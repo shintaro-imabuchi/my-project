@@ -88,7 +88,7 @@ def fetch_summary() -> dict | None:
         return None
 
 
-def show_summary(summary: dict) -> None:
+def show_summary(summary: dict, participants: list[dict]) -> None:
     """申し込み状況の集計を表示する。"""
     st.markdown("#### 申し込み状況")
 
@@ -100,11 +100,20 @@ def show_summary(summary: dict) -> None:
 
     st.markdown("##### 種目別エントリー数")
     event_counts: dict = summary.get("event_counts") or {}
-    rows = [
-        {"種目": event, "頭数": event_counts.get(event, 0)}
-        for event in EVENTS
-    ]
-    rows.append({"種目": "合計", "頭数": sum(r["頭数"] for r in rows)})
+    rows = []
+    for event in EVENTS:
+        total = event_counts.get(event, 0)
+        class_counts = {
+            cls: sum(
+                1 for p in participants
+                if event in (p.get("events") or []) and p.get("dog_class") == cls
+            )
+            for cls in CLASS_ORDER
+        }
+        rows.append({"種目": event, "頭数": total, **class_counts})
+    totals = {"種目": "合計", "頭数": sum(r["頭数"] for r in rows)}
+    totals.update({cls: sum(r[cls] for r in rows) for cls in CLASS_ORDER})
+    rows.append(totals)
     st.dataframe(rows, hide_index=True, use_container_width=True)
 
 
@@ -140,6 +149,16 @@ def show_race_schedule(participants: list[dict]) -> None:
         st.info("出走表を表示できるデータがありません。")
 
 
+def show_nav_buttons() -> None:
+    """ナビゲーションボタンを表示し、選択状態をsession_stateに保存する。"""
+    if st.button("参加者・犬情報一覧を見る", use_container_width=True):
+        st.session_state["staff_view"] = "participants"
+    if st.button("申し込み状況をみる", use_container_width=True):
+        st.session_state["staff_view"] = "summary"
+    if st.button("出走表を見る", use_container_width=True):
+        st.session_state["staff_view"] = "schedule"
+
+
 def main() -> None:
     """スタッフアプリのメインエントリーポイント。"""
     st.set_page_config(
@@ -153,22 +172,36 @@ def main() -> None:
     if not check_staff_password():
         return
 
-    with st.spinner("読み込み中..."):
-        participants = fetch_participants()
+    show_nav_buttons()
 
-    if participants is not None:
-        show_participants_table(participants)
+    view = st.session_state.get("staff_view")
+
+    if view == "participants":
         st.divider()
-        with st.spinner("集計中..."):
+        with st.spinner("読み込み中..."):
+            participants = fetch_participants()
+        if participants is not None:
+            show_participants_table(participants)
+
+    elif view == "summary":
+        st.divider()
+        with st.spinner("読み込み中..."):
+            participants = fetch_participants()
             summary = fetch_summary()
-        if summary:
-            show_summary(summary)
+        if participants is not None and summary:
+            show_summary(summary, participants)
+
+    elif view == "schedule":
         st.divider()
-        show_race_schedule(participants)
+        with st.spinner("読み込み中..."):
+            participants = fetch_participants()
+        if participants is not None:
+            show_race_schedule(participants)
 
     st.divider()
     if st.button("ログアウト", use_container_width=True):
         del st.session_state["staff_authenticated"]
+        st.session_state.pop("staff_view", None)
         st.rerun()
 
 
