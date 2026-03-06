@@ -428,6 +428,43 @@ def show_participants_table(rows: list[dict]) -> None:
     )
 
 
+def fetch_user_emails() -> list[dict] | None:
+    """ユーザーの氏名とメールアドレスの一覧をSupabaseから取得する。"""
+    try:
+        response = get_supabase().rpc("get_user_emails").execute()
+        return response.data
+    except Exception as e:
+        st.error(f"メールアドレスの取得に失敗しました: {e}")
+        return None
+
+
+def show_bcc_list() -> None:
+    """BCC用メールアドレス一覧を表示する。"""
+    st.markdown("#### BCC用メールアドレス一覧")
+    with st.spinner("読み込み中..."):
+        users = fetch_user_emails()
+    if users is None:
+        return
+    if not users:
+        st.info("登録済みユーザーがいません。")
+        return
+
+    fmt = st.radio(
+        "書式",
+        options=["引用符付き氏名 + メールアドレス", "メールアドレスのみ"],
+        horizontal=True,
+        key="bcc_format",
+    )
+    if fmt == "引用符付き氏名 + メールアドレス":
+        bcc = ",\n".join(
+            f'"{u["user_name"]}" <{u["email"]}>' for u in users if u.get("email")
+        )
+    else:
+        bcc = ",\n".join(u["email"] for u in users if u.get("email"))
+
+    st.text_area("BCCにコピー＆ペーストしてください", value=bcc, height=150)
+
+
 def show_admin_home() -> None:
     """管理者ホーム画面を表示する。"""
     st.subheader("管理者メニュー")
@@ -489,6 +526,9 @@ def show_admin_home() -> None:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="results_download",
             )
+
+    st.divider()
+    show_bcc_list()
 
     st.divider()
     if st.button("ログアウト", use_container_width=True):
