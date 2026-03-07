@@ -167,7 +167,7 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
 
-    st.title("アジリティー練習会 スタッフ画面")
+    st.subheader("アジリティー練習会 スタッフ画面")
 
     if not check_staff_password():
         return

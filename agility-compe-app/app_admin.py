@@ -381,52 +381,6 @@ def process_results_excel(file_bytes: bytes) -> bytes:
     return buf.getvalue()
 
 
-def show_participants_table(rows: list[dict]) -> None:
-    """参加者・犬情報の一覧表を表示する。"""
-    st.markdown("#### 参加者・犬情報一覧")
-
-    if not rows:
-        st.info("登録データがありません。")
-        return
-
-    data = []
-    for i, row in enumerate(rows, start=1):
-        events = row.get("events") or []
-        data.append({
-            "No.": i,
-            "参加者名": row["user_name"],
-            "犬名": row["dog_name"],
-            "犬種": row["breed"],
-            "クラス": row["dog_class"],
-            "参加種目": "、".join(events),
-            "参加料金": f"{calc_fee(events):,}円",
-        })
-
-    total_fee = sum(EVENT_FEES.get(e, 0) for row in rows for e in (row.get("events") or []))
-    data.append({
-        "No.": "",
-        "参加者名": "合計",
-        "犬名": "",
-        "犬種": "",
-        "クラス": "",
-        "参加種目": "",
-        "参加料金": f"{total_fee:,}円",
-    })
-
-    st.dataframe(
-        data,
-        hide_index=True,
-        use_container_width=True,
-        column_config={"参加料金": st.column_config.TextColumn(width="small")},
-    )
-
-    st.download_button(
-        label="Excelダウンロード",
-        data=generate_excel(data),
-        file_name="参加者一覧.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
 
 def fetch_user_emails() -> list[dict] | None:
     """ユーザーの氏名とメールアドレスの一覧をSupabaseから取得する。"""
@@ -485,7 +439,48 @@ def show_admin_home() -> None:
         participants = fetch_participants()
 
     if participants is not None:
-        show_participants_table(participants)
+        st.markdown("#### 参加者・犬情報一覧")
+
+        # 画面表示・Excelダウンロード共通のデータを構築
+        display_data: list[dict] = []
+        for i, row in enumerate(participants, start=1):
+            events = row.get("events") or []
+            display_data.append({
+                "No.": i,
+                "参加者名": row["user_name"],
+                "犬名": row["dog_name"],
+                "犬種": row["breed"],
+                "クラス": row["dog_class"],
+                "参加種目": "、".join(events),
+                "参加料金": f"{calc_fee(events):,}円",
+            })
+        total_fee = sum(EVENT_FEES.get(e, 0) for row in participants for e in (row.get("events") or []))
+        display_data.append({
+            "No.": "", "参加者名": "合計", "犬名": "", "犬種": "", "クラス": "", "参加種目": "",
+            "参加料金": f"{total_fee:,}円",
+        })
+
+        col1, col2 = st.columns(2)
+        if col1.button("画面表示", use_container_width=True):
+            st.session_state["show_participants"] = True
+        col2.download_button(
+            label="Excelダウンロード",
+            data=generate_excel(display_data),
+            file_name="参加者一覧.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+
+        if st.session_state.get("show_participants"):
+            if not participants:
+                st.info("登録データがありません。")
+            else:
+                st.dataframe(
+                    display_data,
+                    hide_index=True,
+                    use_container_width=True,
+                    column_config={"参加料金": st.column_config.TextColumn(width="small")},
+                )
 
         st.divider()
         st.markdown("#### 種目別出走表")
