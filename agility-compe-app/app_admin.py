@@ -27,7 +27,7 @@ _ROW_LIMIT_TIME = 5
 _ROW_TURNING_SPEED = 6
 _ROW_HEADER = 8
 _ROW_DATA_START = 9
-_RESULT_COLS = ["順位", "氏名", "犬名", "犬種", "クラス", "タイム", "失敗", "拒絶", "減点", "スピード", "合計タイム"]
+_RESULT_COLS = ["順位", "氏名", "犬名", "犬種", "クラス", "タイム", "失敗", "拒絶", "減点", "スピード"]
 
 
 def calc_fee(events: list[str]) -> int:
@@ -234,18 +234,22 @@ def _build_results_workbook(
         cell.alignment = Alignment(horizontal="center")
 
     # データ行（下線付き）
-    _TIME_COLS = {6, 10, 11}  # タイム列・スピード列・合計タイム列（1-indexed）
+    _TIME_COLS = {6, 9, 10}  # タイム列・減点列・スピード列（1-indexed）
+    blue_font = Font(color="0000FF")
     for i, p in enumerate(data):
         row_num = _ROW_DATA_START + i
         row_vals = [
             p["rank"], p["user_name"], p["dog_name"], p["breed"], p["dog_class"],
-            p["time"], p["fail"], p["refuse"], p["deduct"], p["speed"], p["total_time"],
+            p["time"], p["fail"], p["refuse"], p["deduct"], p["speed"],
         ]
+        is_clean = p.get("time", 0) > 0 and p.get("deduct") == 0
         for col_idx, val in enumerate(row_vals, start=1):
             cell = ws.cell(row=row_num, column=col_idx, value=val)
             cell.border = bottom_border
             if col_idx in _TIME_COLS:
                 cell.number_format = "0.00"
+            if is_clean:
+                cell.font = blue_font
 
     # 列幅調整
     col_values_list = [
@@ -259,7 +263,6 @@ def _build_results_workbook(
         [str(p["refuse"]) for p in data],
         [str(p["deduct"]) for p in data],
         [str(p["speed"]) for p in data],
-        [str(p["total_time"]) for p in data],
     ]
     for col_idx, (col_name, values) in enumerate(zip(_RESULT_COLS, col_values_list), start=1):
         max_width = _str_width(col_name)
@@ -297,7 +300,7 @@ def generate_results_skeleton_zip(participants: list[dict]) -> bytes | None:
                     {
                         "rank": "", "user_name": p["user_name"], "dog_name": p["dog_name"],
                         "breed": p["breed"], "dog_class": p["dog_class"],
-                        "time": 0, "fail": 0, "refuse": 0, "deduct": 0, "speed": 0.00, "total_time": 0,
+                        "time": 0, "fail": 0, "refuse": 0, "deduct": 0.00, "speed": 0.00,
                     }
                     for p in rows
                 ]
@@ -333,9 +336,8 @@ def process_results_excel(file_bytes: bytes) -> bytes:
         time_val = float(ws.cell(row=row_num, column=6).value or 0)
         fail_val = int(ws.cell(row=row_num, column=7).value or 0)
         refuse_val = int(ws.cell(row=row_num, column=8).value or 0)
-        deduct = (fail_val + refuse_val) * 5 + max(0, int(time_val - std_time))
+        deduct = round((fail_val + refuse_val) * 5 + max(0.0, time_val - std_time), 2)
         speed = round(course_len / time_val, 2) if time_val > 0 else 0.00
-        total_time = round(time_val + deduct, 2)
         raw.append({
             "rank": "",
             "user_name": str(user_name),
@@ -347,18 +349,17 @@ def process_results_excel(file_bytes: bytes) -> bytes:
             "refuse": refuse_val,
             "deduct": deduct,
             "speed": speed,
-            "total_time": total_time,
         })
         row_num += 1
 
     # グループ分けと並び替え
     group1 = sorted(
-        [p for p in raw if p["time"] > 0 and p["deduct"] == 0],
-        key=lambda p: p["total_time"],
+        [p for p in raw if p["fail"] == 0 and p["refuse"] == 0 and p["time"] > 0],
+        key=lambda p: p["time"],
     )
     group2 = sorted(
-        [p for p in raw if p["time"] > 0 and p["deduct"] > 0],
-        key=lambda p: p["total_time"],
+        [p for p in raw if (p["fail"] > 0 or p["refuse"] > 0) and p["time"] > 0],
+        key=lambda p: (p["deduct"], p["time"]),
     )
     group3 = [p for p in raw if p["time"] == 0]
 
@@ -517,7 +518,7 @@ def show_admin_home() -> None:
             st.download_button(
                 label="成績表をダウンロード（Excel）",
                 data=result_bytes,
-                file_name=f"成績表_{uploaded.name}",
+                file_name=f"{uploaded.name.removesuffix('.xlsx')}_結果.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key="results_download",
             )
