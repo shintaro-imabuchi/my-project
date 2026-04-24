@@ -22,7 +22,7 @@ jobs:
           playwright install chromium --with-deps
 
       - name: Run auto login
-        run: python scripts/auto_login.py
+        run: python agility-compe-app/scripts/auto_login.py
         env:
           APP_URL: ${{ secrets.APP_URL }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -41,7 +41,7 @@ jobs:
         run: pip install httpx
 
       - name: Run auto login entry
-        run: python scripts/auto_login_entry.py
+        run: python agility-compe-app/scripts/auto_login_entry.py
         env:
           APP_ENTRY_URL: ${{ secrets.APP_ENTRY_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
