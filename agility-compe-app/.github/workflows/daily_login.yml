@@ -1,0 +1,50 @@
+name: Daily Login
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # 毎日 UTC 1:00 (JST 10:00)
+  workflow_dispatch:      # 手動実行も可能
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium --with-deps
+
+      - name: Run auto login
+        run: python scripts/auto_login.py
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+
+  login_entry:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install httpx
+        run: pip install httpx
+
+      - name: Run auto login entry
+        run: python scripts/auto_login_entry.py
+        env:
+          APP_ENTRY_URL: ${{ secrets.APP_ENTRY_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ENTRY_EMAIL: ${{ secrets.ENTRY_EMAIL }}
+          ENTRY_PASSWORD: ${{ secrets.ENTRY_PASSWORD }}
