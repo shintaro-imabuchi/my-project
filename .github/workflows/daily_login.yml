@@ -2,7 +2,9 @@ name: Daily Login
 
 on:
   schedule:
-    - cron: '0 1 * * *'  # 毎日 UTC 1:00 (JST 10:00)
+    - cron: '0 1 * * *'   # UTC  1:00 (JST 10:00)
+    - cron: '0 9 * * *'   # UTC  9:00 (JST 18:00)
+    - cron: '0 17 * * *'  # UTC 17:00 (JST 翌 2:00)
   workflow_dispatch:      # 手動実行も可能
 
 jobs:
