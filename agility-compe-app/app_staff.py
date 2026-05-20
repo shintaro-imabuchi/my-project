@@ -2,7 +2,8 @@ import pandas as pd
 import streamlit as st
 
 from supabase_client import get_supabase
-from app_admin import EVENT_FEES, CLASS_ORDER, calc_fee
+from app_admin import CLASS_ORDER, calc_fee
+from utils.settings import get_event_fees
 
 
 def fetch_participants() -> list[dict] | None:
@@ -57,7 +58,8 @@ def show_participants_table(rows: list[dict]) -> None:
             "参加料金": f"{calc_fee(events):,}円",
         })
 
-    total_fee = sum(EVENT_FEES.get(e, 0) for row in rows for e in (row.get("events") or []))
+    event_fees = get_event_fees()
+    total_fee = sum(event_fees.get(e, 0) for row in rows for e in (row.get("events") or []))
     data.append({
         "No.": "",
         "参加者名": "合計",
@@ -74,9 +76,6 @@ def show_participants_table(rows: list[dict]) -> None:
         use_container_width=True,
         column_config={"参加料金": st.column_config.TextColumn(width="small")},
     )
-
-
-EVENTS: list[str] = ["ビギナー", "JP1.5", "JP2.5", "AG1", "AG2", "AG3"]
 
 
 def fetch_summary() -> dict | None:
@@ -101,8 +100,9 @@ def show_summary(summary: dict, participants: list[dict]) -> None:
 
     st.markdown("##### 種目別エントリー数")
     event_counts: dict = summary.get("event_counts") or {}
+    event_fees = get_event_fees()
     rows = []
-    for event in EVENTS:
+    for event in event_fees:
         total = event_counts.get(event, 0)
         class_counts = {
             cls: sum(
@@ -124,7 +124,7 @@ def fetch_race_configs() -> list[dict] | None:
         data = get_supabase().table("race_configs").select("*").execute().data
         if not data:
             return data
-        event_order = list(EVENT_FEES.keys())
+        event_order = list(get_event_fees().keys())
         return sorted(
             data,
             key=lambda c: (
@@ -208,7 +208,7 @@ def show_race_config_input() -> None:
     st.markdown("##### 設定を入力・更新")
     col1, col2 = st.columns(2)
     with col1:
-        event = st.selectbox("種目", options=list(EVENT_FEES.keys()), key="config_event")
+        event = st.selectbox("種目", options=list(get_event_fees().keys()), key="config_event")
     with col2:
         dog_class = st.selectbox("クラス", options=CLASS_ORDER, key="config_class")
 
@@ -346,7 +346,7 @@ def show_race_schedule(participants: list[dict]) -> None:
     st.markdown("#### 出走表")
 
     any_shown = False
-    for event in EVENT_FEES:
+    for event in get_event_fees():
         for cls in CLASS_ORDER:
             rows = [
                 p for p in participants

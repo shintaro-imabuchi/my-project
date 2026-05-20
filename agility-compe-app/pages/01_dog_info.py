@@ -1,9 +1,9 @@
 import streamlit as st
 
 from supabase_client import get_supabase
+from utils.settings import get_event_fees
 
 CLASSES: list[str] = ["S", "M", "IM", "L"]
-EVENTS: list[str] = ["ビギナー", "JP1.5", "JP2.5", "AG1", "AG2", "AG3"]
 MAX_DOGS: int = 4
 
 
@@ -54,7 +54,7 @@ def show_edit_form(dog: dict) -> None:
         st.markdown("**参加種目 *** （1つ以上選択）")
         checked: dict[str, bool] = {}
         current_events = dog.get("events") or []
-        for event in EVENTS:
+        for event in get_event_fees():
             checked[event] = st.checkbox(event, value=event in current_events)
         col_upd, col_del = st.columns(2)
         with col_upd:
@@ -108,7 +108,7 @@ def show_add_form(user_id: str, current_count: int) -> None:
         dog_class = st.radio("クラス *", CLASSES, horizontal=True)
         st.markdown("**参加種目 *** （1つ以上選択）")
         checked: dict[str, bool] = {}
-        for event in EVENTS:
+        for event in get_event_fees():
             checked[event] = st.checkbox(event)
         submitted = st.form_submit_button(
             "登録する", type="primary", use_container_width=True

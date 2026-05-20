@@ -7,16 +7,12 @@ from openpyxl.styles import Font, PatternFill, Alignment
 import streamlit as st
 
 from supabase_client import get_supabase
-from utils.settings import get_registration_open, set_registration_open
-
-EVENT_FEES: dict[str, int] = {
-    "ビギナー": 2000,
-    "JP1.5": 3000,
-    "JP2.5": 3000,
-    "AG1": 3000,
-    "AG2": 3000,
-    "AG3": 3000,
-}
+from utils.settings import (
+    get_registration_open,
+    set_registration_open,
+    get_event_fees,
+    set_event_fees,
+)
 
 CLASS_ORDER: list[str] = ["S", "M", "IM", "L"]
 
@@ -30,9 +26,11 @@ _ROW_DATA_START = 9
 _RESULT_COLS = ["順位", "氏名", "犬名", "犬種", "クラス", "タイム", "失敗", "拒絶", "減点", "スピード"]
 
 
-def calc_fee(events: list[str]) -> int:
+def calc_fee(events: list[str], event_fees: dict[str, int] | None = None) -> int:
     """参加種目リストから参加料金の合計を計算する。"""
-    return sum(EVENT_FEES.get(e, 0) for e in events)
+    if event_fees is None:
+        event_fees = get_event_fees()
+    return sum(event_fees.get(e, 0) for e in events)
 
 
 def check_admin_password() -> bool:
@@ -120,7 +118,7 @@ def generate_excel(data: list[dict]) -> bytes:
     return buf.getvalue()
 
 
-def generate_race_excel(participants: list[dict]) -> bytes | None:
+def generate_race_excel(participants: list[dict], event_fees: dict[str, int]) -> bytes | None:
     """種目・クラス別出走表をExcel形式で生成してバイト列で返す。シートが1枚も作成できない場合はNoneを返す。"""
     wb = openpyxl.Workbook()
     wb.remove(wb.active)  # デフォルトシートを削除
@@ -128,7 +126,7 @@ def generate_race_excel(participants: list[dict]) -> bytes | None:
     header_fill = PatternFill(fill_type="solid", fgColor="D9E1F2")
     col_names = ["No.", "氏名", "犬名", "犬種", "クラス"]
 
-    for event in EVENT_FEES:
+    for event in event_fees:
         for cls in CLASS_ORDER:
             rows = [
                 p for p in participants
@@ -280,13 +278,13 @@ def _build_results_workbook(
     return wb
 
 
-def generate_results_skeleton_zip(participants: list[dict]) -> bytes | None:
+def generate_results_skeleton_zip(participants: list[dict], event_fees: dict[str, int]) -> bytes | None:
     """種目・クラス別成績表骨格をZIP形式で生成してバイト列で返す。対象データなしの場合はNoneを返す。"""
     zip_buf = io.BytesIO()
     created = 0
 
     with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for event in EVENT_FEES:
+        for event in event_fees:
             for cls in CLASS_ORDER:
                 rows = [
                     p for p in participants
@@ -382,7 +380,6 @@ def process_results_excel(file_bytes: bytes) -> bytes:
     return buf.getvalue()
 
 
-
 def fetch_user_emails() -> list[dict] | None:
     """ユーザーの氏名とメールアドレスの一覧をSupabaseから取得する。"""
     try:
@@ -420,9 +417,93 @@ def show_bcc_list() -> None:
     st.text_area("BCCにコピー＆ペーストしてください", value=bcc, height=150)
 
 
+def show_event_settings() -> None:
+    """競技種目と参加料金の設定UIを表示する。
+
+    行の追加・編集・削除ができる。保存するとSupabaseに反映される。
+    並び順を変えたい場合は削除してから再追加する。
+    """
+    st.markdown("#### 競技種目設定")
+    st.caption("種目名・料金を編集し「保存」してください。並び順を変えたい場合は削除して再追加してください。")
+
+    if "event_list_edit" not in st.session_state:
+        event_fees = get_event_fees()
+        st.session_state["event_list_edit"] = [
+            {"name": n, "fee": f} for n, f in event_fees.items()
+        ]
+
+    events: list[dict] = st.session_state["event_list_edit"]
+    n = len(events)
+
+    def _read_inputs() -> None:
+        """ウィジェットの現在値を events リストに反映する。"""
+        for j in range(n):
+            events[j]["name"] = str(st.session_state.get(f"ev_name_{j}", events[j]["name"]))
+            events[j]["fee"] = int(st.session_state.get(f"ev_fee_{j}", events[j]["fee"]) or 0)
+
+    def _clear_inputs() -> None:
+        """ウィジェットの session_state キーを削除し、次回レンダリングで value= から再初期化させる。"""
+        for j in range(n + 1):
+            st.session_state.pop(f"ev_name_{j}", None)
+            st.session_state.pop(f"ev_fee_{j}", None)
+
+    # ヘッダー行
+    h = st.columns([3, 2, 1])
+    h[0].markdown("**種目名**")
+    h[1].markdown("**参加料金（円）**")
+
+    for i, event in enumerate(events):
+        c = st.columns([3, 2, 1])
+        c[0].text_input(
+            "種目名", value=event["name"], key=f"ev_name_{i}", label_visibility="collapsed"
+        )
+        c[1].number_input(
+            "料金", value=event["fee"], min_value=0, step=100, format="%d",
+            key=f"ev_fee_{i}", label_visibility="collapsed",
+        )
+        if c[2].button("削除", key=f"ev_del_{i}", use_container_width=True):
+            _read_inputs()
+            events.pop(i)
+            _clear_inputs()
+            st.rerun()
+
+    col_add, col_reset, col_save = st.columns(3)
+
+    if col_add.button("＋ 種目を追加", use_container_width=True):
+        _read_inputs()
+        events.append({"name": "", "fee": 0})
+        _clear_inputs()
+        st.rerun()
+
+    if col_reset.button("リセット（保存済みに戻す）", use_container_width=True, key="reset_event_fees"):
+        st.session_state.pop("event_list_edit", None)
+        _clear_inputs()
+        st.rerun()
+
+    if col_save.button("保存", type="primary", use_container_width=True, key="save_event_fees"):
+        _read_inputs()
+        new_fees: dict[str, int] = {
+            ev["name"].strip(): ev["fee"]
+            for ev in events
+            if ev["name"].strip()
+        }
+        if not new_fees:
+            st.error("種目を1つ以上入力してください。")
+            return
+        set_event_fees(new_fees)
+        st.session_state["event_list_edit"] = [{"name": n, "fee": f} for n, f in new_fees.items()]
+        _clear_inputs()
+        st.success(f"種目リストを保存しました（{len(new_fees)}種目）。")
+        st.rerun()
+
+
 def show_admin_home() -> None:
     """管理者ホーム画面を表示する。"""
     st.subheader("管理者メニュー")
+
+    show_event_settings()
+
+    st.divider()
 
     st.markdown("#### 新規登録受付設定")
     registration_open = get_registration_open()
@@ -435,6 +516,8 @@ def show_admin_home() -> None:
         st.rerun()
 
     st.divider()
+
+    event_fees = get_event_fees()
 
     with st.spinner("読み込み中..."):
         participants = fetch_participants()
@@ -453,9 +536,9 @@ def show_admin_home() -> None:
                 "犬種": row["breed"],
                 "クラス": row["dog_class"],
                 "参加種目": "、".join(events),
-                "参加料金": f"{calc_fee(events):,}円",
+                "参加料金": f"{calc_fee(events, event_fees):,}円",
             })
-        total_fee = sum(EVENT_FEES.get(e, 0) for row in participants for e in (row.get("events") or []))
+        total_fee = sum(event_fees.get(e, 0) for row in participants for e in (row.get("events") or []))
         display_data.append({
             "No.": "", "参加者名": "合計", "犬名": "", "犬種": "", "クラス": "", "参加種目": "",
             "参加料金": f"{total_fee:,}円",
@@ -485,7 +568,7 @@ def show_admin_home() -> None:
 
         st.divider()
         st.markdown("#### 種目別出走表")
-        race_excel = generate_race_excel(participants)
+        race_excel = generate_race_excel(participants, event_fees)
         if race_excel:
             st.download_button(
                 label="出走表をダウンロード（Excel）",
@@ -498,7 +581,7 @@ def show_admin_home() -> None:
 
         st.divider()
         st.markdown("#### 種目別成績表")
-        skeleton_zip = generate_results_skeleton_zip(participants)
+        skeleton_zip = generate_results_skeleton_zip(participants, event_fees)
         if skeleton_zip:
             st.download_button(
                 label="成績表骨格をダウンロード（ZIP）",

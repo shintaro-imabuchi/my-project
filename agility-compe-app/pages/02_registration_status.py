@@ -1,8 +1,7 @@
 import streamlit as st
 
 from supabase_client import get_supabase
-
-EVENTS: list[str] = ["ビギナー", "JP1.5", "JP2.5", "AG1", "AG2", "AG3"]
+from utils.settings import get_event_fees
 
 
 def fetch_summary() -> dict | None:
@@ -31,7 +30,7 @@ def show_summary(summary: dict) -> None:
     event_counts: dict = summary.get("event_counts") or {}
     rows = [
         {"種目": event, "頭数": event_counts.get(event, 0)}
-        for event in EVENTS
+        for event in get_event_fees()
     ]
     rows.append({"種目": "合計", "頭数": sum(r["頭数"] for r in rows)})
     st.dataframe(rows, hide_index=True, use_container_width=True)
