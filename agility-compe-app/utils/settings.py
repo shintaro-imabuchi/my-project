@@ -81,3 +81,38 @@ def set_event_fees(event_fees: dict[str, int]) -> None:
         {"key": "event_fees", "value": data},
         on_conflict="key",
     ).execute()
+
+
+def get_login_message() -> str | None:
+    """ログイン画面に表示するメッセージをSupabaseから取得する。
+
+    行が存在しない場合、値がNullの場合、エラー時はNoneを返す。
+    """
+    try:
+        response = (
+            get_supabase()
+            .table("settings")
+            .select("value")
+            .eq("key", "login_message")
+            .single()
+            .execute()
+        )
+        val = response.data.get("value")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+        return None
+    except Exception:
+        return None
+
+
+def set_login_message(message: str | None) -> None:
+    """ログイン画面に表示するメッセージをSupabaseに保存する。
+
+    Args:
+        message: 表示するメッセージ。Noneまたは空文字列の場合はNullを保存する。
+    """
+    value = message.strip() if message and message.strip() else None
+    get_supabase().table("settings").upsert(
+        {"key": "login_message", "value": value},
+        on_conflict="key",
+    ).execute()

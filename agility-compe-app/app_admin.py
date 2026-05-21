@@ -12,6 +12,8 @@ from utils.settings import (
     set_registration_open,
     get_event_fees,
     set_event_fees,
+    get_login_message,
+    set_login_message,
 )
 
 CLASS_ORDER: list[str] = ["S", "M", "IM", "L"]
@@ -40,6 +42,10 @@ def check_admin_password() -> bool:
     """
     if st.session_state.get("admin_authenticated"):
         return True
+
+    msg = get_login_message()
+    if msg:
+        st.markdown(f"### **{msg}**")
 
     st.subheader("管理者ログイン")
     password = st.text_input("パスワード", type="password", key="admin_password_input")
@@ -497,9 +503,30 @@ def show_event_settings() -> None:
         st.rerun()
 
 
+def show_login_message_settings() -> None:
+    """ログイン画面開催名称設定UIを表示する。"""
+    st.markdown("#### ログイン画面開催名称設定")
+    st.caption("ログイン画面の先頭に表示する開催名称を設定してください。空白にすると非表示になります。")
+    current = get_login_message()
+    new_msg = st.text_input(
+        "開催名称（全角20文字程度）",
+        value=current or "",
+        max_chars=60,
+        key="login_message_input",
+    )
+    if st.button("保存", type="primary", key="save_login_message"):
+        set_login_message(new_msg)
+        st.success("開催名称を保存しました。")
+        st.rerun()
+
+
 def show_admin_home() -> None:
     """管理者ホーム画面を表示する。"""
     st.subheader("管理者メニュー")
+
+    show_login_message_settings()
+
+    st.divider()
 
     show_event_settings()
 

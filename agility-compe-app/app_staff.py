@@ -3,7 +3,7 @@ import streamlit as st
 
 from supabase_client import get_supabase
 from app_admin import CLASS_ORDER, calc_fee
-from utils.settings import get_event_fees
+from utils.settings import get_event_fees, get_login_message
 
 
 def fetch_participants() -> list[dict] | None:
@@ -486,7 +486,12 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
 
-    st.subheader("アジリティー練習会 スタッフ画面")
+    if not st.session_state.get("staff_authenticated"):
+        msg = get_login_message()
+        if msg:
+            st.markdown(f"### **{msg}**")
+
+    st.subheader("スタッフ画面")
 
     if not check_staff_password():
         return

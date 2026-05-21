@@ -2,12 +2,11 @@ import streamlit as st
 from supabase_auth.errors import AuthApiError
 
 from supabase_client import get_supabase
-from utils.settings import get_registration_open
+from utils.settings import get_registration_open, get_login_message
 
 
 def show_top() -> None:
     """トップ画面（ログイン/新規登録ボタン）を表示する。"""
-    st.subheader("アジリティー練習会")
     st.subheader("参加登録システム")
 
     if st.button("ログイン", type="primary", use_container_width=True):
@@ -111,7 +110,6 @@ def show_home() -> None:
     user = st.session_state["user"]
     name: str = user.user_metadata.get("name", "")
 
-    st.subheader("アジリティー練習会")
     st.subheader("参加登録システム")
     st.success(f"ようこそ、{name} さん！")
 
@@ -149,16 +147,20 @@ def main() -> None:
 
     if st.session_state.get("user"):
         show_home()
-    elif st.session_state.get("mode") == "login":
-        show_login_form()
-    elif st.session_state.get("mode") == "register":
-        if get_registration_open():
-            show_register_form()
-        else:
-            st.session_state["mode"] = None
-            st.rerun()
     else:
-        show_top()
+        msg = get_login_message()
+        if msg:
+            st.markdown(f"### **{msg}**")
+        if st.session_state.get("mode") == "login":
+            show_login_form()
+        elif st.session_state.get("mode") == "register":
+            if get_registration_open():
+                show_register_form()
+            else:
+                st.session_state["mode"] = None
+                st.rerun()
+        else:
+            show_top()
 
 
 if __name__ == "__main__":
