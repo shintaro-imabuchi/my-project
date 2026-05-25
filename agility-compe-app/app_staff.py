@@ -169,6 +169,16 @@ def upsert_race_config(
         return False
 
 
+def delete_race_config(event: str, dog_class: str) -> bool:
+    """指定種目・クラスのコース設定をSupabaseから削除する。"""
+    try:
+        get_supabase().table("race_configs").delete().eq("event", event).eq("dog_class", dog_class).execute()
+        return True
+    except Exception as e:
+        st.error(f"コース設定の削除に失敗しました: {e}")
+        return False
+
+
 def fetch_results_for_config(race_config_id: int) -> list[dict] | None:
     """指定race_config_idの成績一覧をRPC経由で取得する。"""
     try:
@@ -242,9 +252,9 @@ def show_race_config_input() -> None:
     with col5:
         limit_time_str = st.text_input("リミットタイム (sec)", value=_str_val("limit_time"), key=f"limit_time_{sfx}")
 
-    col_save, col_discard = st.columns(2)
+    cols = st.columns(3) if existing else st.columns(2)
 
-    if col_save.button("保存", type="primary", use_container_width=True, key="config_save"):
+    if cols[0].button("保存", type="primary", use_container_width=True, key="config_save"):
         try:
             course_len = float(course_len_str)
             std_time = float(std_time_str)
@@ -256,10 +266,17 @@ def show_race_config_input() -> None:
             st.success(f"{event} - {dog_class}クラス のコース設定を保存しました。")
             st.rerun()
 
-    if col_discard.button("入力を破棄", use_container_width=True, key="config_discard"):
+    if cols[1].button("入力を破棄", use_container_width=True, key="config_discard"):
         for k in [f"course_len_{sfx}", f"std_time_{sfx}", f"limit_time_{sfx}"]:
             st.session_state.pop(k, None)
         st.rerun()
+
+    if existing and cols[2].button("保存済みを削除", use_container_width=True, key="config_delete"):
+        if delete_race_config(event, dog_class):
+            for k in [f"course_len_{sfx}", f"std_time_{sfx}", f"limit_time_{sfx}"]:
+                st.session_state.pop(k, None)
+            st.success(f"{event} - {dog_class}クラス のコース設定を削除しました。")
+            st.rerun()
 
 
 def show_race_results_input() -> None:
