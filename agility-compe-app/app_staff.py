@@ -3,7 +3,7 @@ import io
 import pandas as pd
 import streamlit as st
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
@@ -504,6 +504,93 @@ def calc_rankings(results: list[dict]) -> list[dict]:
     return group1 + group2 + group3
 
 
+def generate_race_results_pdf(
+    title: str,
+    r0: dict,
+    ranked: list[dict],
+    clean_flags: list[bool],
+) -> bytes:
+    """成績表をA4横PDF形式で生成してバイト列で返す。クリーンランは青字で出力する。"""
+    pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+    FONT = "HeiseiKakuGo-W5"
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=landscape(A4),
+        leftMargin=15 * mm, rightMargin=15 * mm,
+        topMargin=15 * mm, bottomMargin=15 * mm,
+    )
+    title_style = ParagraphStyle("title", fontName=FONT, fontSize=16, spaceAfter=4 * mm)
+    info_style = ParagraphStyle("info", fontName=FONT, fontSize=10, spaceAfter=2 * mm)
+    header_bg = colors.HexColor("#D9E1F2")
+
+    def _fmt(v) -> str:
+        if v is None:
+            return "-"
+        try:
+            return f"{float(v):.2f}"
+        except (TypeError, ValueError):
+            return str(v)
+
+    col_names = ["順位", "氏名", "犬名", "犬種", "クラス", "タイム", "失敗", "拒絶", "減点", "スピード"]
+    col_widths = [15 * mm, 40 * mm, 35 * mm, 45 * mm, 17 * mm, 22 * mm, 15 * mm, 15 * mm, 20 * mm, 22 * mm]
+
+    table_data = [col_names] + [
+        [
+            str(r["rank"]),
+            r["user_name"],
+            r["dog_name"],
+            r["breed"],
+            r["dog_class"],
+            _fmt(r.get("run_time")),
+            str(int(r.get("fail") or 0)),
+            str(int(r.get("refuse") or 0)),
+            _fmt(r.get("deduct")),
+            _fmt(r.get("speed")),
+        ]
+        for r in ranked
+    ]
+
+    style_cmds = [
+        ("FONTNAME", (0, 0), (-1, -1), FONT),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("BACKGROUND", (0, 0), (-1, 0), header_bg),
+        ("ROWBACKGROUND", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F5F5")]),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("ALIGN", (4, 0), (4, -1), "CENTER"),
+        ("ALIGN", (5, 0), (5, -1), "RIGHT"),
+        ("ALIGN", (6, 0), (6, -1), "CENTER"),
+        ("ALIGN", (7, 0), (7, -1), "CENTER"),
+        ("ALIGN", (8, 0), (8, -1), "RIGHT"),
+        ("ALIGN", (9, 0), (9, -1), "RIGHT"),
+    ]
+    for i, is_clean in enumerate(clean_flags):
+        if is_clean:
+            style_cmds.append(("TEXTCOLOR", (0, i + 1), (-1, i + 1), colors.blue))
+
+    table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    table.setStyle(TableStyle(style_cmds))
+
+    info_text = (
+        f"コース全長: {r0['course_len']} m　　"
+        f"標準タイム: {r0['std_time']} sec　　"
+        f"リミットタイム: {r0['limit_time']} sec　　"
+        f"旋回スピード: {r0['turning_speed']} m/sec"
+    )
+    story = [
+        Paragraph(title, title_style),
+        Paragraph(info_text, info_style),
+        Spacer(1, 4 * mm),
+        table,
+    ]
+    doc.build(story)
+    return buf.getvalue()
+
+
 def show_race_results_view() -> None:
     """成績表表示画面を表示する。"""
     st.markdown("#### 成績表")
@@ -537,6 +624,15 @@ def show_race_results_view() -> None:
 
     ranked = calc_rankings(results)
     clean_flags = [r["rank"] != "失格" and (r.get("deduct") or 0) == 0 for r in ranked]
+
+    pdf_bytes = generate_race_results_pdf(selected_label, r0, ranked, clean_flags)
+    st.download_button(
+        label="成績表をダウンロード（PDF）",
+        data=pdf_bytes,
+        file_name=f"{selected_label}_成績表.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+    )
 
     df = pd.DataFrame([
         {
