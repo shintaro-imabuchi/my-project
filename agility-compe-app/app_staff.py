@@ -1,5 +1,14 @@
+import io
+
 import pandas as pd
 import streamlit as st
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from supabase_client import get_supabase
 from app_admin import calc_fee
@@ -343,12 +352,83 @@ def show_race_results_input() -> None:
             st.success(f"{selected_label} の成績を保存しました。")
 
 
+def generate_race_schedule_pdf(participants: list[dict], event_fees: dict[str, int]) -> bytes | None:
+    """種目・クラス別出走表をPDF形式で生成してバイト列で返す。対象データなしの場合はNoneを返す。"""
+    pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+    FONT = "HeiseiKakuGo-W5"
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=20 * mm, rightMargin=20 * mm,
+        topMargin=20 * mm, bottomMargin=20 * mm,
+    )
+    title_style = ParagraphStyle("title", fontName=FONT, fontSize=16, spaceAfter=6 * mm)
+    col_names = ["No.", "氏名", "犬名", "犬種", "クラス"]
+    col_widths = [15 * mm, 45 * mm, 45 * mm, 55 * mm, 20 * mm]
+    header_bg = colors.HexColor("#D9E1F2")
+
+    story: list = []
+    created = False
+
+    for event in event_fees:
+        for cls in CLASS_ORDER:
+            rows = [
+                p for p in participants
+                if event in (p.get("events") or []) and p.get("dog_class") == cls
+            ]
+            if not rows:
+                continue
+
+            if created:
+                story.append(PageBreak())
+
+            story.append(Paragraph(f"{event}　{cls}クラス　出走表", title_style))
+
+            table_data = [col_names] + [
+                [str(i), p["user_name"], p["dog_name"], p["breed"], p["dog_class"]]
+                for i, p in enumerate(rows, start=1)
+            ]
+            table = Table(table_data, colWidths=col_widths, repeatRows=1)
+            table.setStyle(TableStyle([
+                ("FONTNAME", (0, 0), (-1, -1), FONT),
+                ("FONTSIZE", (0, 0), (-1, -1), 11),
+                ("BACKGROUND", (0, 0), (-1, 0), header_bg),
+                ("ROWBACKGROUND", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F5F5")]),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("ALIGN", (0, 0), (0, -1), "CENTER"),
+                ("ALIGN", (4, 0), (4, -1), "CENTER"),
+            ]))
+            story.append(table)
+            created = True
+
+    if not created:
+        return None
+
+    doc.build(story)
+    return buf.getvalue()
+
+
 def show_race_schedule(participants: list[dict]) -> None:
     """種目別・クラス別の出走表をWeb表示する。"""
     st.markdown("#### 出走表")
 
+    event_fees = get_event_fees()
+    pdf_bytes = generate_race_schedule_pdf(participants, event_fees)
+    if pdf_bytes:
+        st.download_button(
+            label="出走表をダウンロード（PDF）",
+            data=pdf_bytes,
+            file_name="出走表.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
     any_shown = False
-    for event in get_event_fees():
+    for event in event_fees:
         for cls in CLASS_ORDER:
             rows = [
                 p for p in participants
