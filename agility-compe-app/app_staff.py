@@ -2,8 +2,10 @@ import pandas as pd
 import streamlit as st
 
 from supabase_client import get_supabase
-from app_admin import CLASS_ORDER, calc_fee
+from app_admin import calc_fee
 from utils.settings import get_event_fees, get_login_message
+
+CLASS_ORDER: list[str] = ["S", "M", "IM", "L"]
 
 
 def fetch_participants() -> list[dict] | None:
