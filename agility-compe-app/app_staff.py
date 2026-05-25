@@ -242,7 +242,9 @@ def show_race_config_input() -> None:
     with col5:
         limit_time_str = st.text_input("リミットタイム (sec)", value=_str_val("limit_time"), key=f"limit_time_{sfx}")
 
-    if st.button("保存", type="primary", use_container_width=True, key="config_save"):
+    col_save, col_discard = st.columns(2)
+
+    if col_save.button("保存", type="primary", use_container_width=True, key="config_save"):
         try:
             course_len = float(course_len_str)
             std_time = float(std_time_str)
@@ -253,6 +255,11 @@ def show_race_config_input() -> None:
         if upsert_race_config(event, dog_class, course_len, std_time, limit_time):
             st.success(f"{event} - {dog_class}クラス のコース設定を保存しました。")
             st.rerun()
+
+    if col_discard.button("入力を破棄", use_container_width=True, key="config_discard"):
+        for k in [f"course_len_{sfx}", f"std_time_{sfx}", f"limit_time_{sfx}"]:
+            st.session_state.pop(k, None)
+        st.rerun()
 
 
 def show_race_results_input() -> None:
