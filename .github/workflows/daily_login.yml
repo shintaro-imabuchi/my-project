@@ -7,6 +7,9 @@ on:
     - cron: '0 17 * * *'  # UTC 17:00 (JST 翌 2:00)
   workflow_dispatch:      # 手動実行も可能
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   login_entry:
     runs-on: ubuntu-latest
