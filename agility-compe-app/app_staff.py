@@ -126,7 +126,13 @@ def show_summary(summary: dict, participants: list[dict]) -> None:
     totals = {"種目": "合計", "頭数": sum(r["頭数"] for r in rows)}
     totals.update({cls: sum(r[cls] for r in rows) for cls in CLASS_ORDER})
     rows.append(totals)
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    small = st.column_config.NumberColumn(width="small")
+    st.dataframe(
+        rows,
+        hide_index=True,
+        use_container_width=True,
+        column_config={"頭数": small, "S": small, "M": small, "IM": small, "L": small},
+    )
 
 
 def fetch_race_configs() -> list[dict] | None:
