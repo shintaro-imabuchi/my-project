@@ -12,8 +12,9 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 APP_ENTRY_URL: str = os.environ["APP_ENTRY_URL"]
 
-PAGE_TIMEOUT = 60_000
-WAKE_TIMEOUT = 5_000
+PAGE_TIMEOUT = 120_000
+WAKE_TIMEOUT = 10_000
+WAKE_WAIT_MS = 30_000
 
 
 def main() -> None:
@@ -26,10 +27,11 @@ def main() -> None:
             print(f"アクセス中: {APP_ENTRY_URL}")
             page.goto(APP_ENTRY_URL, timeout=PAGE_TIMEOUT)
 
-            # スリープ中なら起動ボタンをクリック
+            # スリープ中なら起動ボタンをクリックして復帰を待つ
             try:
                 page.get_by_text("Yes, get this app back up").click(timeout=WAKE_TIMEOUT)
                 print("スリープからの復帰ボタンをクリックしました")
+                page.wait_for_timeout(WAKE_WAIT_MS)
             except PlaywrightTimeoutError:
                 pass
 
