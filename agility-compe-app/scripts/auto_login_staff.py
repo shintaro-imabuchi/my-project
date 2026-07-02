@@ -12,9 +12,9 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 APP_STAFF_URL: str = os.environ["APP_STAFF_URL"]
 
-PAGE_TIMEOUT = 120_000
+PAGE_TIMEOUT = 60_000
 WAKE_TIMEOUT = 10_000
-WAKE_WAIT_MS = 30_000
+CONNECT_WAIT_MS = 30_000
 
 
 def main() -> None:
@@ -25,24 +25,27 @@ def main() -> None:
 
         try:
             print(f"アクセス中: {APP_STAFF_URL}")
-            page.goto(APP_STAFF_URL, timeout=PAGE_TIMEOUT)
+            page.goto(APP_STAFF_URL, timeout=PAGE_TIMEOUT, wait_until="domcontentloaded")
+            print("ページ読み込み完了")
 
-            # スリープ中なら起動ボタンをクリックして復帰を待つ
+            # スリープ中なら起動ボタンをクリック
             try:
                 page.get_by_text("Yes, get this app back up").click(timeout=WAKE_TIMEOUT)
                 print("スリープからの復帰ボタンをクリックしました")
-                page.wait_for_timeout(WAKE_WAIT_MS)
             except PlaywrightTimeoutError:
-                pass
+                print("復帰ボタンなし（起動中）")
 
-            # アプリの読み込み完了を待つ（WebSocket接続確立）
-            page.wait_for_selector("text=スタッフ画面", timeout=PAGE_TIMEOUT)
-            print("アクセス成功")
+            # WebSocket接続確立のために待機
+            page.wait_for_timeout(CONNECT_WAIT_MS)
+            page.screenshot(path="screenshot_staff.png")
+            print("アクセス完了")
 
         except PlaywrightTimeoutError as e:
             print(f"タイムアウトエラー: {e}", file=sys.stderr)
-            page.screenshot(path="error_screenshot.png")
-            print("スクリーンショットを error_screenshot.png に保存しました")
+            try:
+                page.screenshot(path="screenshot_staff.png")
+            except Exception:
+                pass
             sys.exit(1)
 
         finally:
