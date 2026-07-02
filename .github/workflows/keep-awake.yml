@@ -34,11 +34,3 @@ jobs:
         env:
           APP_ENTRY_URL: ${{ secrets.APP_ENTRY_URL }}
         run: python agility-compe-app/scripts/auto_login_entry.py
-
-      - name: Upload screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots
-          path: screenshot_*.png
-          if-no-files-found: ignore

@@ -37,15 +37,10 @@ def main() -> None:
 
             # WebSocket接続確立のために待機
             page.wait_for_timeout(CONNECT_WAIT_MS)
-            page.screenshot(path="screenshot_entry.png")
             print("アクセス完了")
 
         except PlaywrightTimeoutError as e:
             print(f"タイムアウトエラー: {e}", file=sys.stderr)
-            try:
-                page.screenshot(path="screenshot_entry.png")
-            except Exception:
-                pass
             sys.exit(1)
 
         finally:
