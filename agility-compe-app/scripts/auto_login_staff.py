@@ -1,8 +1,8 @@
-"""参加登録アプリのスリープ回避スクリプト。
+"""スタッフアプリのスリープ回避スクリプト。
 
 Playwright でアプリ URL を実際にレンダリングして WebSocket 接続を確立し、
 Streamlit のスリープを防ぐ。
-環境変数 APP_ENTRY_URL が必要。
+環境変数 APP_STAFF_URL が必要。
 """
 
 import os
@@ -10,7 +10,7 @@ import sys
 
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
-APP_ENTRY_URL: str = os.environ["APP_ENTRY_URL"]
+APP_STAFF_URL: str = os.environ["APP_STAFF_URL"]
 
 PAGE_TIMEOUT = 60_000
 WAKE_TIMEOUT = 5_000
@@ -23,8 +23,8 @@ def main() -> None:
         page = browser.new_page()
 
         try:
-            print(f"アクセス中: {APP_ENTRY_URL}")
-            page.goto(APP_ENTRY_URL, timeout=PAGE_TIMEOUT)
+            print(f"アクセス中: {APP_STAFF_URL}")
+            page.goto(APP_STAFF_URL, timeout=PAGE_TIMEOUT)
 
             # スリープ中なら起動ボタンをクリック
             try:
@@ -34,7 +34,7 @@ def main() -> None:
                 pass
 
             # アプリの読み込み完了を待つ（WebSocket接続確立）
-            page.wait_for_selector("text=参加登録システム", timeout=PAGE_TIMEOUT)
+            page.wait_for_selector("text=スタッフ画面", timeout=PAGE_TIMEOUT)
             print("アクセス成功")
 
         except PlaywrightTimeoutError as e:

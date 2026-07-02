@@ -1,0 +1,31 @@
+name: Keep Streamlit Apps Awake
+
+on:
+  schedule:
+    - cron: '0 */8 * * *'  # 8時間ごとに実行（スリープ閾値12時間以内）
+  workflow_dispatch:  # 手動実行用
+
+jobs:
+  keep-awake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Playwright
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: Keep staff app awake
+        env:
+          APP_STAFF_URL: ${{ secrets.APP_STAFF_URL }}
+        run: python scripts/auto_login_staff.py
+
+      - name: Keep entry app awake
+        env:
+          APP_ENTRY_URL: ${{ secrets.APP_ENTRY_URL }}
+        run: python scripts/auto_login_entry.py
