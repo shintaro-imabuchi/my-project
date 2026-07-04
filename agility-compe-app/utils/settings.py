@@ -116,3 +116,143 @@ def set_login_message(message: str | None) -> None:
         {"key": "login_message", "value": value},
         on_conflict="key",
     ).execute()
+
+
+def get_guideline_url() -> str | None:
+    """トップ画面「練習会要綱を見る」のURLをSupabaseから取得する。
+
+    行が存在しない場合、値がNullの場合、エラー時はNoneを返す。
+    """
+    try:
+        response = (
+            get_supabase()
+            .table("settings")
+            .select("value")
+            .eq("key", "guideline_url")
+            .single()
+            .execute()
+        )
+        val = response.data.get("value")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+        return None
+    except Exception:
+        return None
+
+
+def set_guideline_url(url: str | None) -> None:
+    """トップ画面「練習会要綱を見る」のURLをSupabaseに保存する。
+
+    Args:
+        url: URL文字列。Noneまたは空文字列の場合はNullを保存する。
+    """
+    value = url.strip() if url and url.strip() else None
+    get_supabase().table("settings").upsert(
+        {"key": "guideline_url", "value": value},
+        on_conflict="key",
+    ).execute()
+
+
+def get_notice_url() -> str | None:
+    """ホーム画面「練習会実施のご案内を見る」のURLをSupabaseから取得する。
+
+    行が存在しない場合、値がNullの場合、エラー時はNoneを返す。
+    """
+    try:
+        response = (
+            get_supabase()
+            .table("settings")
+            .select("value")
+            .eq("key", "notice_url")
+            .single()
+            .execute()
+        )
+        val = response.data.get("value")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+        return None
+    except Exception:
+        return None
+
+
+def set_notice_url(url: str | None) -> None:
+    """ホーム画面「練習会実施のご案内を見る」のURLをSupabaseに保存する。
+
+    Args:
+        url: URL文字列。Noneまたは空文字列の場合はNullを保存する。
+    """
+    value = url.strip() if url and url.strip() else None
+    get_supabase().table("settings").upsert(
+        {"key": "notice_url", "value": value},
+        on_conflict="key",
+    ).execute()
+
+
+def get_top_image_url() -> str | None:
+    """トップ画面に表示する画像のURLをSupabaseから取得する。
+
+    行が存在しない場合、値がNullの場合、エラー時はNoneを返す。
+    """
+    try:
+        response = (
+            get_supabase()
+            .table("settings")
+            .select("value")
+            .eq("key", "top_image_url")
+            .single()
+            .execute()
+        )
+        val = response.data.get("value")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+        return None
+    except Exception:
+        return None
+
+
+def set_top_image_url(url: str | None) -> None:
+    """トップ画面に表示する画像のURLをSupabaseに保存する。
+
+    Args:
+        url: URL文字列。Noneまたは空文字列の場合はNullを保存する。
+    """
+    value = url.strip() if url and url.strip() else None
+    get_supabase().table("settings").upsert(
+        {"key": "top_image_url", "value": value},
+        on_conflict="key",
+    ).execute()
+
+
+def get_home_info_message() -> str | None:
+    """ログイン後ホーム画面に表示するお知らせをSupabaseから取得する。
+
+    行が存在しない場合、値がNullの場合、エラー時はNoneを返す。
+    """
+    try:
+        response = (
+            get_supabase()
+            .table("settings")
+            .select("value")
+            .eq("key", "home_info_message")
+            .single()
+            .execute()
+        )
+        val = response.data.get("value")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+        return None
+    except Exception:
+        return None
+
+
+def set_home_info_message(message: str | None) -> None:
+    """ログイン後ホーム画面に表示するお知らせをSupabaseに保存する。
+
+    Args:
+        message: 表示するメッセージ。Noneまたは空文字列の場合はNullを保存する。
+    """
+    value = message.strip() if message and message.strip() else None
+    get_supabase().table("settings").upsert(
+        {"key": "home_info_message", "value": value},
+        on_conflict="key",
+    ).execute()

@@ -13,6 +13,14 @@ from utils.settings import (
     set_event_fees,
     get_login_message,
     set_login_message,
+    get_home_info_message,
+    set_home_info_message,
+    get_guideline_url,
+    set_guideline_url,
+    get_notice_url,
+    set_notice_url,
+    get_top_image_url,
+    set_top_image_url,
 )
 
 
@@ -246,11 +254,105 @@ def show_login_message_settings() -> None:
         st.rerun()
 
 
+def show_link_url_settings() -> None:
+    """リンクボタンURL設定UIを表示する。"""
+    st.markdown("#### リンクURL設定")
+    st.caption("空白にするとボタンが非表示になります。")
+
+    guideline_url = st.text_input(
+        "練習会要綱を見る（トップ画面）",
+        value=get_guideline_url() or "",
+        key="guideline_url_input",
+    )
+    notice_url = st.text_input(
+        "練習会実施のご案内を見る（ホーム画面）",
+        value=get_notice_url() or "",
+        key="notice_url_input",
+    )
+    if st.button("保存", type="primary", key="save_link_urls"):
+        set_guideline_url(guideline_url)
+        set_notice_url(notice_url)
+        st.success("URLを保存しました。")
+        st.rerun()
+
+
+def show_top_image_settings() -> None:
+    """トップ画面表示画像設定UIを表示する。"""
+    st.markdown("#### トップ画面画像設定")
+    st.caption("トップ画面最下部に表示する画像を設定します。Supabase Storageの「images」バケット（パブリック）が必要です。")
+
+    current_url = get_top_image_url()
+    if current_url:
+        st.image(current_url, caption="現在の画像")
+        if st.button("画像を削除", key="delete_top_image"):
+            try:
+                get_supabase().storage.from_("images").remove(["top_image"])
+            except Exception:
+                pass
+            set_top_image_url(None)
+            st.success("画像を削除しました。")
+            st.rerun()
+    else:
+        st.info("画像は設定されていません。")
+
+    uploaded_file = st.file_uploader(
+        "画像ファイルを選択",
+        type=["jpg", "jpeg", "png", "gif", "webp"],
+        key="top_image_upload",
+    )
+    if uploaded_file is not None:
+        if st.button("アップロード", type="primary", key="upload_top_image"):
+            try:
+                file_bytes = uploaded_file.read()
+                mime_type = uploaded_file.type
+                bucket = get_supabase().storage.from_("images")
+                bucket.upload(
+                    path="top_image",
+                    file=file_bytes,
+                    file_options={"content-type": mime_type, "upsert": "true"},
+                )
+                url = bucket.get_public_url("top_image")
+                set_top_image_url(url)
+                st.success("画像をアップロードしました。")
+                st.rerun()
+            except Exception as e:
+                st.error(f"アップロードに失敗しました: {e}")
+
+
+def show_home_info_message_settings() -> None:
+    """ログイン後ホーム画面のお知らせ設定UIを表示する。"""
+    st.markdown("#### ホーム画面お知らせ設定")
+    st.caption("ログイン後のホーム画面に表示するお知らせを設定してください。空白にすると非表示になります。")
+    current = get_home_info_message()
+    new_msg = st.text_area(
+        "お知らせ本文",
+        value=current or "",
+        height=120,
+        key="home_info_message_input",
+    )
+    if st.button("保存", type="primary", key="save_home_info_message"):
+        set_home_info_message(new_msg)
+        st.success("お知らせを保存しました。")
+        st.rerun()
+
+
 def show_admin_home() -> None:
     """管理者ホーム画面を表示する。"""
     st.subheader("管理者メニュー")
 
     show_login_message_settings()
+
+    st.divider()
+
+    show_home_info_message_settings()
+
+    st.divider()
+
+    show_link_url_settings()
+
+    st.divider()
+
+    show_top_image_settings()
 
     st.divider()
 

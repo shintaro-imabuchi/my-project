@@ -2,7 +2,14 @@ import streamlit as st
 from supabase_auth.errors import AuthApiError
 
 from supabase_client import get_supabase
-from utils.settings import get_registration_open, get_login_message
+from utils.settings import (
+    get_registration_open,
+    get_login_message,
+    get_home_info_message,
+    get_guideline_url,
+    get_notice_url,
+    get_top_image_url,
+)
 
 
 def show_top() -> None:
@@ -21,11 +28,13 @@ def show_top() -> None:
         st.warning("新規登録を締め切りました")
         st.button("新規登録", use_container_width=True, disabled=True)
 
-    st.link_button(
-        "練習会要綱を見る",
-        url="https://drive.google.com/file/d/1dVK-AFDItP7RHFZ7QnN3nkHVNIkK-6iD/view?usp=drive_link",
-        use_container_width=True,
-    )
+    guideline_url = get_guideline_url()
+    if guideline_url:
+        st.link_button("練習会要綱を見る", url=guideline_url, use_container_width=True)
+
+    top_image_url = get_top_image_url()
+    if top_image_url:
+        st.image(top_image_url)
 
 
 def show_login_form() -> None:
@@ -119,16 +128,13 @@ def show_home() -> None:
     if st.button("申し込み状況を見る", use_container_width=True):
         st.switch_page("pages/02_registration_status.py")
 
-    st.link_button(
-        "練習会実施のご案内を見る",
-        url="https://drive.google.com/file/d/1dVK-AFDItP7RHFZ7QnN3nkHVNIkK-6iD/view?usp=drive_link",
-        use_container_width=True,
-    )
+    notice_url = get_notice_url()
+    if notice_url:
+        st.link_button("練習会実施のご案内を見る", url=notice_url, use_container_width=True)
 
-    st.info(
-        "参加をキャンセルされる場合は、犬情報を削除したのち、次のメールアドレスまでキャンセルの連絡をお願いします。\n\n"
-        "compe@puffin.tokyo.jp"
-    )
+    info_msg = get_home_info_message()
+    if info_msg:
+        st.info(info_msg)
 
     st.divider()
     if st.button("ログアウト", use_container_width=True):
