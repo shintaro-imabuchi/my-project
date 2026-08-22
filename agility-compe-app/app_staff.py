@@ -10,7 +10,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from supabase_client import get_supabase
+from supabase_client import get_supabase, get_competition_id, sign_in_as_owner
 from app_admin import calc_fee
 from utils.settings import get_event_fees, get_login_message
 
@@ -20,7 +20,9 @@ CLASS_ORDER: list[str] = ["S", "M", "IM", "L"]
 def fetch_participants() -> list[dict] | None:
     """参加者と犬情報の一覧をSupabaseから取得する。"""
     try:
-        response = get_supabase().rpc("get_participants_with_dogs").execute()
+        response = get_supabase().rpc(
+            "get_entries_with_dogs", {"p_competition_id": get_competition_id()}
+        ).execute()
         return response.data
     except Exception as e:
         st.error(f"データの取得に失敗しました: {e}")
@@ -40,6 +42,7 @@ def check_staff_password() -> bool:
 
     if st.button("ログイン", type="primary", use_container_width=True):
         if password == st.secrets["staff"]["password"]:
+            sign_in_as_owner()
             st.session_state["staff_authenticated"] = True
             st.rerun()
         else:
@@ -92,7 +95,9 @@ def show_participants_table(rows: list[dict]) -> None:
 def fetch_summary() -> dict | None:
     """Supabaseから申し込み状況サマリーを取得する。"""
     try:
-        response = get_supabase().rpc("get_registration_summary").execute()
+        response = get_supabase().rpc(
+            "get_registration_summary", {"p_competition_id": get_competition_id()}
+        ).execute()
         return response.data
     except Exception as e:
         st.error(f"データの取得に失敗しました: {e}")
@@ -105,7 +110,7 @@ def show_summary(summary: dict, participants: list[dict]) -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("参加登録者数", f"{summary['user_count']} 名")
+        st.metric("参加登録数", f"{summary['entry_count']} 件")
     with col2:
         st.metric("登録済み犬数", f"{summary['dog_count']} 頭")
 
@@ -136,9 +141,16 @@ def show_summary(summary: dict, participants: list[dict]) -> None:
 
 
 def fetch_race_configs() -> list[dict] | None:
-    """race_configsテーブルから全設定を取得する。種目・クラスの定義済み順でソートして返す。"""
+    """race_configsテーブルからこの大会の全設定を取得する。種目・クラスの定義済み順でソートして返す。"""
     try:
-        data = get_supabase().table("race_configs").select("*").execute().data
+        data = (
+            get_supabase()
+            .table("race_configs")
+            .select("*")
+            .eq("competition_id", get_competition_id())
+            .execute()
+            .data
+        )
         if not data:
             return data
         event_order = list(get_event_fees().keys())
@@ -161,13 +173,14 @@ def upsert_race_config(
     try:
         get_supabase().table("race_configs").upsert(
             {
+                "competition_id": get_competition_id(),
                 "event": event,
                 "dog_class": dog_class,
                 "course_len": course_len,
                 "std_time": std_time,
                 "limit_time": limit_time,
             },
-            on_conflict="event,dog_class",
+            on_conflict="competition_id,event,dog_class",
         ).execute()
         return True
     except Exception as e:
@@ -178,7 +191,9 @@ def upsert_race_config(
 def delete_race_config(event: str, dog_class: str) -> bool:
     """指定種目・クラスのコース設定をSupabaseから削除する。"""
     try:
-        get_supabase().table("race_configs").delete().eq("event", event).eq("dog_class", dog_class).execute()
+        get_supabase().table("race_configs").delete().eq(
+            "competition_id", get_competition_id()
+        ).eq("event", event).eq("dog_class", dog_class).execute()
         return True
     except Exception as e:
         st.error(f"コース設定の削除に失敗しました: {e}")
@@ -194,12 +209,12 @@ def fetch_results_for_config(race_config_id: int) -> list[dict] | None:
         return None
 
 
-def upsert_race_result(race_config_id: int, dog_id: str, run_time: float, fail: int, refuse: int) -> bool:
+def upsert_race_result(race_config_id: int, entry_id: int, run_time: float, fail: int, refuse: int) -> bool:
     """成績を1件upsertする。"""
     try:
         get_supabase().table("race_results").upsert(
-            {"race_config_id": race_config_id, "dog_id": dog_id, "time": run_time, "fail": fail, "refuse": refuse},
-            on_conflict="race_config_id,dog_id",
+            {"race_config_id": race_config_id, "entry_id": entry_id, "time": run_time, "fail": fail, "refuse": refuse},
+            on_conflict="race_config_id,entry_id",
         ).execute()
         return True
     except Exception as e:
@@ -312,14 +327,14 @@ def show_race_results_input() -> None:
         return
 
     existing_results = fetch_results_for_config(race_config_id) or []
-    results_dict = {str(r["dog_id"]): r for r in existing_results}
+    results_dict = {str(r["entry_id"]): r for r in existing_results}
 
     # 種目・クラス切り替え時にsession_stateを初期化
     if st.session_state.get("_ri_config_id") != race_config_id:
         st.session_state["_ri_config_id"] = race_config_id
         for idx, p in enumerate(participants):
-            k = f"{idx}_{p['dog_id']}"
-            ex = results_dict.get(str(p["dog_id"]))
+            k = f"{idx}_{p['entry_id']}"
+            ex = results_dict.get(str(p["entry_id"]))
             if ex:
                 rt = float(ex.get("run_time") or 0)
                 st.session_state[f"ri_disq_{k}"] = (rt == 0)
@@ -344,7 +359,7 @@ def show_race_results_input() -> None:
     st.divider()
 
     for idx, p in enumerate(participants):
-        k = f"{idx}_{p['dog_id']}"
+        k = f"{idx}_{p['entry_id']}"
         c1, c2, c3, c4, c5 = st.columns([3, 1.5, 2, 1.5, 1.5])
         with c1:
             st.write(f"{p['user_name']} / {p['dog_name']}")
@@ -361,7 +376,7 @@ def show_race_results_input() -> None:
     if st.button("一括保存", type="primary", use_container_width=True, key="ri_save"):
         errors: list[str] = []
         for idx, p in enumerate(participants):
-            k = f"{idx}_{p['dog_id']}"
+            k = f"{idx}_{p['entry_id']}"
             if st.session_state.get(f"ri_disq_{k}", False):
                 rt, fail, refuse = 0.0, 0, 0
             else:
@@ -372,7 +387,7 @@ def show_race_results_input() -> None:
                     continue
                 fail = int(st.session_state.get(f"ri_fail_{k}") or 0)
                 refuse = int(st.session_state.get(f"ri_refuse_{k}") or 0)
-            if not upsert_race_result(race_config_id, p["dog_id"], rt, fail, refuse):
+            if not upsert_race_result(race_config_id, p["entry_id"], rt, fail, refuse):
                 errors.append(f"{p['user_name']}: 保存に失敗しました")
 
         if errors:

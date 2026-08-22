@@ -1,6 +1,6 @@
 import streamlit as st
 
-from supabase_client import get_supabase
+from supabase_client import get_supabase, get_competition_id
 from utils.settings import get_event_fees
 
 CLASS_ORDER: list[str] = ["S", "M", "IM", "L"]
@@ -9,7 +9,9 @@ CLASS_ORDER: list[str] = ["S", "M", "IM", "L"]
 def fetch_summary() -> dict | None:
     """Supabaseから申し込み状況サマリーを取得する。"""
     try:
-        response = get_supabase().rpc("get_registration_summary").execute()
+        response = get_supabase().rpc(
+            "get_registration_summary", {"p_competition_id": get_competition_id()}
+        ).execute()
         return response.data
     except Exception as e:
         st.error(f"データの取得に失敗しました: {e}")
@@ -19,7 +21,9 @@ def fetch_summary() -> dict | None:
 def fetch_participants() -> list[dict] | None:
     """参加者と犬情報の一覧をSupabaseから取得する。"""
     try:
-        response = get_supabase().rpc("get_participants_with_dogs").execute()
+        response = get_supabase().rpc(
+            "get_entries_with_dogs", {"p_competition_id": get_competition_id()}
+        ).execute()
         return response.data
     except Exception as e:
         st.error(f"データの取得に失敗しました: {e}")
@@ -30,7 +34,7 @@ def show_summary(summary: dict, participants: list[dict]) -> None:
     """申し込み状況の集計を表示する。"""
     col1, col2 = st.columns(2)
     with col1:
-        st.metric("参加登録者数", f"{summary['user_count']} 名")
+        st.metric("参加登録数", f"{summary['entry_count']} 件")
     with col2:
         st.metric("登録済み犬数", f"{summary['dog_count']} 頭")
 

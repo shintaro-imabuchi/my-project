@@ -9,12 +9,13 @@ from utils.settings import (
     get_guideline_url,
     get_notice_url,
     get_top_image_url,
+    get_competition_name,
 )
 
 
 def show_top() -> None:
     """トップ画面（ログイン/新規登録ボタン）を表示する。"""
-    st.subheader("参加登録システム")
+    st.subheader(f"{get_login_message() or get_competition_name()} 参加登録")
 
     if st.button("ログイン", type="primary", use_container_width=True):
         st.session_state["mode"] = "login"
@@ -119,7 +120,7 @@ def show_home() -> None:
     user = st.session_state["user"]
     name: str = user.user_metadata.get("name", "")
 
-    st.subheader("参加登録システム")
+    st.subheader(get_login_message() or get_competition_name())
     st.success(f"ようこそ、{name} さん！")
 
     if st.button("犬情報の登録・変更・削除", type="primary", use_container_width=True):
@@ -154,9 +155,6 @@ def main() -> None:
     if st.session_state.get("user"):
         show_home()
     else:
-        msg = get_login_message()
-        if msg:
-            st.markdown(f"### **{msg}**")
         if st.session_state.get("mode") == "login":
             show_login_form()
         elif st.session_state.get("mode") == "register":

@@ -5,7 +5,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 import streamlit as st
 
-from supabase_client import get_supabase
+from supabase_client import get_supabase, get_competition_id, sign_in_as_owner
 from utils.settings import (
     get_registration_open,
     set_registration_open,
@@ -48,6 +48,7 @@ def check_admin_password() -> bool:
 
     if st.button("ログイン", type="primary", use_container_width=True):
         if password == st.secrets["admin"]["password"]:
+            sign_in_as_owner()
             st.session_state["admin_authenticated"] = True
             st.rerun()
         else:
@@ -59,7 +60,9 @@ def check_admin_password() -> bool:
 def fetch_participants() -> list[dict] | None:
     """参加者と犬情報の一覧をSupabaseから取得する。"""
     try:
-        response = get_supabase().rpc("get_participants_with_dogs").execute()
+        response = get_supabase().rpc(
+            "get_entries_with_dogs", {"p_competition_id": get_competition_id()}
+        ).execute()
         return response.data
     except Exception as e:
         st.error(f"データの取得に失敗しました: {e}")

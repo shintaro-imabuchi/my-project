@@ -1,6 +1,6 @@
 import streamlit as st
 
-from supabase_client import get_supabase
+from supabase_client import get_supabase, get_competition_id
 from utils.settings import get_event_fees
 
 CLASSES: list[str] = ["S", "M", "IM", "L"]
@@ -20,7 +20,37 @@ def get_dogs(user_id: str) -> list[dict]:
     return response.data
 
 
-def show_dog_list(dogs: list[dict]) -> None:
+def get_entries_map(competition_id: int, dog_ids: list[str]) -> dict[str, list[str]]:
+    """犬IDをキーに、この大会でのエントリー種目一覧を返す。"""
+    if not dog_ids:
+        return {}
+    response = (
+        get_supabase()
+        .table("entries")
+        .select("dog_id, events")
+        .eq("competition_id", competition_id)
+        .in_("dog_id", dog_ids)
+        .execute()
+    )
+    return {row["dog_id"]: row["events"] for row in response.data}
+
+
+def upsert_entry(competition_id: int, dog_id: str, events: list[str]) -> None:
+    """犬の参加種目をentriesテーブルにupsertする。"""
+    get_supabase().table("entries").upsert(
+        {"competition_id": competition_id, "dog_id": dog_id, "events": events},
+        on_conflict="competition_id,dog_id",
+    ).execute()
+
+
+def delete_entry(competition_id: int, dog_id: str) -> None:
+    """犬のこの大会への参加登録をentriesテーブルから削除する。"""
+    get_supabase().table("entries").delete().eq(
+        "competition_id", competition_id
+    ).eq("dog_id", dog_id).execute()
+
+
+def show_dog_list(dogs: list[dict], entries_map: dict[str, list[str]]) -> None:
     """登録犬一覧をカード形式で表示する。選択ボタンで編集対象を切り替える。"""
     if not dogs:
         st.info("まだ犬が登録されていません。")
@@ -33,8 +63,8 @@ def show_dog_list(dogs: list[dict]) -> None:
             with col_info:
                 prefix = "✏️ " if is_selected else ""
                 st.markdown(f"{prefix}**{dog['dog_name']}**　{dog['breed']}")
-                events_str = "、".join(dog.get("events") or [])
-                st.caption(f"クラス: {dog['dog_class']}　／　種目: {events_str}")
+                events_str = "、".join(entries_map.get(dog["id"]) or [])
+                st.caption(f"クラス: {dog['dog_class']}　／　参加種目: {events_str or '未選択'}")
             with col_btn:
                 if not is_selected and st.button("選択", key=f"sel_{dog['id']}"):
                     st.session_state["selected_dog"] = dog
@@ -43,7 +73,7 @@ def show_dog_list(dogs: list[dict]) -> None:
 
 
 def show_edit_form(dog: dict) -> None:
-    """選択された犬の編集・削除フォームを表示する。"""
+    """選択された犬のプロフィール編集・削除フォームを表示する。"""
     st.subheader(f"「{dog['dog_name']}」を編集")
     form_v: int = st.session_state.get("edit_form_v", 0)
     with st.form(f"edit_dog_form_{form_v}"):
@@ -51,11 +81,6 @@ def show_edit_form(dog: dict) -> None:
         breed = st.text_input("犬種 *", value=dog["breed"])
         class_idx = CLASSES.index(dog["dog_class"]) if dog["dog_class"] in CLASSES else 0
         dog_class = st.radio("クラス *", CLASSES, index=class_idx, horizontal=True)
-        st.markdown("**参加種目 *** （1つ以上選択）")
-        checked: dict[str, bool] = {}
-        current_events = dog.get("events") or []
-        for event in get_event_fees():
-            checked[event] = st.checkbox(event, value=event in current_events)
         col_upd, col_del = st.columns(2)
         with col_upd:
             update_btn = st.form_submit_button(
@@ -65,16 +90,14 @@ def show_edit_form(dog: dict) -> None:
             delete_btn = st.form_submit_button("削除する", use_container_width=True)
 
     if update_btn:
-        selected_events = [e for e, v in checked.items() if v]
-        if not dog_name or not breed or not selected_events:
-            st.error("犬名・犬種・参加種目は必須です。")
+        if not dog_name or not breed:
+            st.error("犬名・犬種は必須です。")
             return
         get_supabase().table("dogs").update(
             {
                 "dog_name": dog_name,
                 "breed": breed,
                 "dog_class": dog_class,
-                "events": selected_events,
             }
         ).eq("id", dog["id"]).execute()
         st.session_state["flash"] = f"「{dog_name}」の情報を更新しました。"
@@ -95,7 +118,7 @@ def show_edit_form(dog: dict) -> None:
 
 
 def show_add_form(user_id: str, current_count: int) -> None:
-    """犬情報登録フォームを表示する。"""
+    """犬プロフィール登録フォームを表示する。参加種目は別セクションで選択する。"""
     st.subheader("犬を追加登録する")
     if current_count >= MAX_DOGS:
         st.warning(f"登録できる犬は最大 {MAX_DOGS} 頭までです。")
@@ -106,18 +129,13 @@ def show_add_form(user_id: str, current_count: int) -> None:
         dog_name = st.text_input("犬名 *")
         breed = st.text_input("犬種 *")
         dog_class = st.radio("クラス *", CLASSES, horizontal=True)
-        st.markdown("**参加種目 *** （1つ以上選択）")
-        checked: dict[str, bool] = {}
-        for event in get_event_fees():
-            checked[event] = st.checkbox(event)
         submitted = st.form_submit_button(
             "登録する", type="primary", use_container_width=True
         )
 
     if submitted:
-        selected_events = [e for e, v in checked.items() if v]
-        if not dog_name or not breed or not selected_events:
-            st.error("犬名・犬種・参加種目は必須です。")
+        if not dog_name or not breed:
+            st.error("犬名・犬種は必須です。")
             return
         get_supabase().table("dogs").insert(
             {
@@ -125,12 +143,48 @@ def show_add_form(user_id: str, current_count: int) -> None:
                 "dog_name": dog_name,
                 "breed": breed,
                 "dog_class": dog_class,
-                "events": selected_events,
             }
         ).execute()
         st.session_state["dog_form_v"] = form_v + 1
-        st.session_state["flash"] = f"「{dog_name}」を登録しました。"
+        st.session_state["flash"] = (
+            f"「{dog_name}」を登録しました。続けて参加種目を選択してください。"
+        )
         st.rerun()
+
+
+def show_event_entry_form(competition_id: int, dog: dict, current_events: list[str]) -> None:
+    """1頭分の参加種目選択フォームを表示する。"""
+    form_v: int = st.session_state.get("entry_form_v", 0)
+    with st.form(f"entry_form_{dog['id']}_{form_v}"):
+        st.markdown(f"**{dog['dog_name']}**　（クラス: {dog['dog_class']}）")
+        checked: dict[str, bool] = {}
+        for event in get_event_fees():
+            checked[event] = st.checkbox(
+                event,
+                value=event in current_events,
+                key=f"entry_{dog['id']}_{event}_{form_v}",
+            )
+        submitted = st.form_submit_button("この犬の参加種目を保存", use_container_width=True)
+
+    if submitted:
+        selected_events = [e for e, v in checked.items() if v]
+        if not selected_events:
+            delete_entry(competition_id, dog["id"])
+            st.session_state["flash"] = f"「{dog['dog_name']}」の参加登録を取り消しました。"
+        else:
+            upsert_entry(competition_id, dog["id"], selected_events)
+            st.session_state["flash"] = f"「{dog['dog_name']}」の参加種目を保存しました。"
+        st.session_state["entry_form_v"] = form_v + 1
+        st.rerun()
+
+
+def show_event_entry_section(
+    competition_id: int, dog: dict, current_events: list[str]
+) -> None:
+    """選択中の犬1頭ぶんの参加種目選択セクションを表示する。"""
+    st.subheader("参加種目の選択")
+    with st.container(border=True):
+        show_event_entry_form(competition_id, dog, current_events)
 
 
 def main() -> None:
@@ -151,25 +205,34 @@ def main() -> None:
 
     user = st.session_state["user"]
     user_id: str = user.id
+    competition_id = get_competition_id()
 
     st.subheader("犬情報")
-    st.caption("変更・削除は選択ボタンで")
+    st.caption("参加種目の登録・変更、削除は選択ボタンで")
 
     dogs = get_dogs(user_id)
     st.caption(f"登録済み: {len(dogs)} 頭 / 最大 {MAX_DOGS} 頭")
 
-    show_dog_list(dogs)
+    entries_map = get_entries_map(competition_id, [d["id"] for d in dogs])
+
+    show_dog_list(dogs, entries_map)
 
     selected_dog = st.session_state.get("selected_dog")
     if selected_dog:
         st.divider()
         show_edit_form(selected_dog)
+        st.divider()
+        show_event_entry_section(
+            competition_id, selected_dog, entries_map.get(selected_dog["id"]) or []
+        )
 
-    st.divider()
-    show_add_form(user_id, len(dogs))
+    if not selected_dog:
+        st.divider()
+        show_add_form(user_id, len(dogs))
 
     st.divider()
     if st.button("ホームに戻る", use_container_width=True):
+        st.session_state.pop("selected_dog", None)
         st.switch_page("app_entry.py")
 
 
