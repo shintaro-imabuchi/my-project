@@ -5,6 +5,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 import streamlit as st
 
+from app_admin_events import show_events_management
 from supabase_client import get_supabase, get_competition_id, sign_in_as_owner
 from utils.settings import (
     get_registration_open,
@@ -427,6 +428,9 @@ def show_admin_home() -> None:
 
     st.divider()
     show_bcc_list()
+
+    st.divider()
+    show_events_management()
 
     st.divider()
     if st.button("ログアウト", use_container_width=True):

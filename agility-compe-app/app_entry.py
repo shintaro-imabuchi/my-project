@@ -31,7 +31,10 @@ def show_top() -> None:
 
     guideline_url = get_guideline_url()
     if guideline_url:
-        st.link_button("練習会要綱を見る", url=guideline_url, use_container_width=True)
+        st.link_button("開催要綱を見る", url=guideline_url, use_container_width=True)
+
+    if st.button("競技会・練習会などの一覧を見る", use_container_width=True):
+        st.switch_page("pages/03_events.py")
 
     top_image_url = get_top_image_url()
     if top_image_url:
