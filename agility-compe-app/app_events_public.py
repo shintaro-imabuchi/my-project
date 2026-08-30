@@ -2,7 +2,7 @@ from datetime import date
 
 import streamlit as st
 
-from utils.events import EVENT_TYPES, get_events, is_registration_open
+from utils.events import EVENT_TYPES, get_event_status, get_events
 
 # このアプリは特定のクラブ・大会に紐づかない、開催情報の公開閲覧専用サイト。
 # ログイン不要・読み取り専用（Supabaseのanonキーのみ使用）。
@@ -11,9 +11,9 @@ from utils.events import EVENT_TYPES, get_events, is_registration_open
 
 
 def _fetch_events(event_types: list[str]) -> list[dict] | None:
-    """絞り込み条件に合うイベント一覧を取得する。失敗時はエラーを表示しNoneを返す。"""
+    """絞り込み条件に合う、掲載ONのイベント一覧を取得する。失敗時はエラーを表示しNoneを返す。"""
     try:
-        return get_events(event_types)
+        return get_events(event_types, published_only=True)
     except Exception as e:
         st.error(f"データの取得に失敗しました: {e}")
         return None
@@ -55,27 +55,6 @@ def _format_registration_period(event: dict) -> str | None:
     return None
 
 
-def _registration_status_label(event: dict) -> tuple[str, str]:
-    """受付状況の表示種別（success/info/caption）とラベルを返す。
-
-    受付中でない場合、申込開始日・締切日から「受付開始前」「受付終了」を
-    判別できるならそれを返し、日付から判断できない場合のみ
-    「受付終了/未定」とする。
-    """
-    if is_registration_open(event):
-        return "success", "受付中"
-
-    today = date.today()
-    opens_on = event.get("registration_opens_on")
-    deadline = event.get("registration_deadline")
-
-    if opens_on and date.fromisoformat(opens_on) > today:
-        return "info", "受付開始前"
-    if deadline and date.fromisoformat(deadline) < today:
-        return "caption", "受付終了"
-    return "caption", "受付終了/未定"
-
-
 def _sort_by_proximity(events: list[dict]) -> list[dict]:
     """開催日が近い順（当日以降を優先）に並び替える。"""
     today = date.today()
@@ -90,16 +69,18 @@ def show_event_card(event: dict) -> None:
     color = _BADGE_COLORS.get(event["event_type"], "gray")
     with st.container(border=True):
         st.markdown(f"**{event['name']}** :{color}-badge[{event['event_type']}]")
-        st.caption(f"開催日: {_format_date_range(event)}")
+
+        info_lines = [f"開催日: {_format_date_range(event)}"]
         if event.get("organizer_name"):
-            st.caption(f"主催: {event['organizer_name']}")
+            info_lines.append(f"主催: {event['organizer_name']}")
         if event.get("venue"):
-            st.caption(f"会場: {event['venue']}")
+            info_lines.append(f"会場: {event['venue']}")
         registration_period = _format_registration_period(event)
         if registration_period:
-            st.caption(f"申込期間: {registration_period}")
+            info_lines.append(f"申込期間: {registration_period}")
+        st.caption("  \n".join(info_lines))
 
-        status_kind, status_label = _registration_status_label(event)
+        status_kind, status_label = get_event_status(event)
         if status_kind == "success":
             st.success(status_label, icon="✅")
         elif status_kind == "info":
@@ -126,9 +107,12 @@ def main() -> None:
     st.subheader("犬のアジリティー 開催情報一覧")
     st.caption("公式競技会・練習会・壮行会・セミナーの開催情報をまとめています。")
 
-    selected_types = st.multiselect(
-        "イベント種別で絞り込み", options=EVENT_TYPES, default=EVENT_TYPES
-    )
+    selected_types = st.pills(
+        "イベント種別で絞り込み",
+        options=EVENT_TYPES,
+        selection_mode="multi",
+        default=EVENT_TYPES,
+    ) or []
 
     fetched = _fetch_events(selected_types) if selected_types else []
     events = _sort_by_proximity(fetched) if fetched else []

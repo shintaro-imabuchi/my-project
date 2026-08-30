@@ -33,7 +33,8 @@ def show_events_list() -> None:
             col_info, col_edit, col_del = st.columns([4, 1, 1])
             with col_info:
                 prefix = "✏️ " if event["id"] == selected_id else ""
-                st.markdown(f"{prefix}**{event['name']}**　（{event['event_type']}）")
+                unpublished = "　:gray-badge[非公開]" if not event.get("registration_open") else ""
+                st.markdown(f"{prefix}**{event['name']}**　（{event['event_type']}）{unpublished}")
                 date_range = event["event_date"]
                 end_date = event.get("event_end_date")
                 if end_date and end_date != event["event_date"]:
@@ -89,7 +90,7 @@ def show_event_form(defaults: dict, event_id: int | None) -> None:
             )
 
         registration_open = st.checkbox(
-            "受付中フラグ", value=defaults.get("registration_open", True)
+            "掲載する（公開一覧に表示）", value=defaults.get("registration_open", True)
         )
         registration_url = st.text_input(
             "登録サイトURL", value=defaults.get("registration_url") or ""
