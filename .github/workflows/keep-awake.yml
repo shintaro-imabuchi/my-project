@@ -36,3 +36,8 @@ jobs:
         env:
           APP_ENTRY_URL: ${{ secrets.APP_ENTRY_URL }}
         run: python agility-compe-app/scripts/auto_login_entry.py
+
+      - name: Keep events public site awake
+        env:
+          APP_EVENTS_URL: ${{ secrets.APP_EVENTS_URL }}
+        run: python agility-compe-app/scripts/auto_login_events.py
