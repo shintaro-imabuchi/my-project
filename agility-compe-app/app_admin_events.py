@@ -3,7 +3,16 @@ from datetime import date
 import streamlit as st
 
 from utils.ai_event_parser import parse_event_with_ai
-from utils.events import EVENT_TYPES, delete_event, get_events, insert_event, update_event
+from utils.events import (
+    EVENT_TYPES,
+    apply_jkc_import,
+    delete_event,
+    get_events,
+    insert_event,
+    load_jkc_export,
+    preview_jkc_import,
+    update_event,
+)
 
 
 def _parse_date_input(value: str | None) -> date | None:
@@ -177,8 +186,66 @@ def show_ai_reader() -> None:
                 st.error(f"AIでの読み取りに失敗しました: {e}")
 
 
+def show_jkc_import() -> None:
+    """MulmoClaude（agility-eventsコレクション）が書き出したJKCデータの取り込みUI。
+
+    いきなり保存はせず、新規/更新の内訳をプレビュー表示してから
+    「反映する」ボタンで初めてeventsテーブルへupsertする。
+    """
+    st.markdown("##### JKCデータの取り込み")
+    st.caption(
+        "MulmoClaude側の`agility-events`コレクションから書き出された公式競技会"
+        "データを取り込みます（source_idで突合し、新規は追加・既存は更新）。"
+        "掲載ON/OFFは常にONで取り込まれます。"
+    )
+
+    if st.button("取り込みファイルを読み込む", key="jkc_load_btn"):
+        records = load_jkc_export()
+        if records is None:
+            st.warning("取り込みファイル（data/jkc_events_export.json）が見つかりません。")
+            st.session_state.pop("jkc_preview", None)
+        else:
+            st.session_state["jkc_preview"] = preview_jkc_import(records)
+
+    preview = st.session_state.get("jkc_preview")
+    if preview:
+        new_count = sum(1 for r in preview if r["_action"] == "新規")
+        update_count = sum(1 for r in preview if r["_action"] == "更新")
+        conflict_count = sum(1 for r in preview if r["_action"] == "要確認（重複）")
+        st.info(f"新規登録: {new_count}件 / 更新: {update_count}件 / 要確認（重複）: {conflict_count}件")
+        if conflict_count:
+            st.warning(
+                "「要確認（重複）」は、複数の取り込み候補が同じ既存レコードに一致してしまった"
+                "ものです（例: 複数日開催の表現方法の違い）。自動反映すると開催期間などの情報が"
+                "失われる恐れがあるため、「反映する」の対象外にしています。該当分は編集フォームから"
+                "手動で確認・修正してください。"
+            )
+        st.dataframe(
+            [
+                {
+                    "区分": r["_action"],
+                    "イベント名": r["name"],
+                    "開催日": r["event_date"],
+                    "会場": r.get("venue") or "-",
+                }
+                for r in preview
+            ],
+            hide_index=True,
+            use_container_width=True,
+        )
+        if st.button("反映する", type="primary", key="jkc_apply_btn"):
+            count = apply_jkc_import(preview)
+            st.session_state.pop("jkc_preview", None)
+            st.session_state["flash_admin_event"] = (
+                f"JKCデータを{count}件反映しました"
+                + (f"（要確認{conflict_count}件はスキップ）" if conflict_count else "")
+                + "。"
+            )
+            st.rerun()
+
+
 def show_events_management() -> None:
-    """開催情報一覧の管理UI（一覧・編集・削除・新規登録・AI読み取り）を表示する。"""
+    """開催情報一覧の管理UI（一覧・編集・削除・新規登録・AI読み取り・JKC取り込み）を表示する。"""
     st.markdown("#### 開催情報管理")
 
     if "flash_admin_event" in st.session_state:
@@ -191,6 +258,8 @@ def show_events_management() -> None:
         st.markdown(f"##### 「{selected_event['name']}」を編集")
         show_event_form(selected_event, selected_event["id"])
     else:
+        st.divider()
+        show_jkc_import()
         st.divider()
         show_ai_reader()
         st.markdown("##### 新規登録")

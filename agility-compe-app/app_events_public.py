@@ -2,7 +2,7 @@ from datetime import date
 
 import streamlit as st
 
-from utils.events import EVENT_TYPES, get_event_status, get_events
+from utils.events import EVENT_TYPES, STATUS_DEFAULT_SELECTED, STATUS_LABELS, get_event_status, get_events
 
 # このアプリは特定のクラブ・大会に紐づかない、開催情報の公開閲覧専用サイト。
 # ログイン不要・読み取り専用（Supabaseのanonキーのみ使用）。
@@ -104,7 +104,15 @@ def show_event_card(event: dict) -> None:
 
 def main() -> None:
     """開催情報一覧サイトのメインエントリーポイント。ログイン不要で閲覧できる。"""
-    st.subheader("犬のアジリティー 開催情報一覧")
+    col_title, col_date = st.columns([3, 1])
+    with col_title:
+        st.subheader("犬のアジリティー 開催情報一覧")
+    with col_date:
+        st.markdown(
+            f"<div style='text-align:right; padding-top:0.8em; color:gray;'>"
+            f"本日: {_format_date(date.today().isoformat())}</div>",
+            unsafe_allow_html=True,
+        )
     st.caption("公式競技会・練習会・壮行会・セミナーの開催情報をまとめています。")
 
     selected_types = st.pills(
@@ -114,7 +122,18 @@ def main() -> None:
         default=EVENT_TYPES,
     ) or []
 
+    selected_statuses = st.pills(
+        "受付状況で絞り込み",
+        options=STATUS_LABELS,
+        selection_mode="multi",
+        default=STATUS_DEFAULT_SELECTED,
+    ) or []
+
     fetched = _fetch_events(selected_types) if selected_types else []
+    if fetched and selected_statuses:
+        fetched = [e for e in fetched if get_event_status(e)[1] in selected_statuses]
+    elif fetched:
+        fetched = []
     events = _sort_by_proximity(fetched) if fetched else []
 
     if fetched is not None and not events:
