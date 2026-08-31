@@ -89,11 +89,15 @@ def show_event_card(event: dict) -> None:
             st.caption(status_label)
 
         with st.expander("詳細を見る"):
+            guideline_url = event.get("guideline_url")
+            if guideline_url:
+                st.link_button("開催要項を見る", url=guideline_url, use_container_width=True)
+
             url = event.get("registration_url")
             if url:
                 st.link_button("参加登録はこちら", url=url, use_container_width=True)
                 st.caption("※別サイトに移動します。")
-            else:
+            elif not guideline_url:
                 st.caption("詳細・申込方法は主催クラブにお問い合わせください。")
 
             if event.get("registration_note"):
