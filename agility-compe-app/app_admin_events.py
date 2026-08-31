@@ -75,7 +75,7 @@ def show_event_form(defaults: dict, event_id: int | None) -> None:
             else 1
         )
         event_type = st.radio("種別 *", EVENT_TYPES, index=type_idx, horizontal=True)
-        organizer_name = st.text_input("主催クラブ名", value=defaults.get("organizer_name") or "")
+        organizer_name = st.text_input("主催者名", value=defaults.get("organizer_name") or "")
         venue = st.text_input("会場", value=defaults.get("venue") or "")
 
         col1, col2 = st.columns(2)

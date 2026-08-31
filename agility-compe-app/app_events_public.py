@@ -88,22 +88,23 @@ def show_event_card(event: dict) -> None:
         else:
             st.caption(status_label)
 
-        with st.expander("詳細を見る"):
-            guideline_url = event.get("guideline_url")
-            if guideline_url:
-                st.link_button("開催要項を見る", url=guideline_url, use_container_width=True)
+        guideline_url = event.get("guideline_url")
+        registration_url = event.get("registration_url")
+        if guideline_url:
+            st.link_button("開催要項を見る", url=guideline_url, use_container_width=True)
+        if registration_url:
+            st.link_button("参加登録はこちら", url=registration_url, use_container_width=True)
+            st.caption("※別サイトに移動します。")
+        if not guideline_url and not registration_url:
+            st.caption("詳細・申込方法は主催者にお問い合わせください。")
 
-            url = event.get("registration_url")
-            if url:
-                st.link_button("参加登録はこちら", url=url, use_container_width=True)
-                st.caption("※別サイトに移動します。")
-            elif not guideline_url:
-                st.caption("詳細・申込方法は主催クラブにお問い合わせください。")
-
-            if event.get("registration_note"):
-                st.markdown(event["registration_note"])
-            if event.get("notes"):
-                st.markdown(event["notes"])
+        extra_notes = event.get("registration_note") or event.get("notes")
+        if extra_notes:
+            with st.expander("詳細を見る"):
+                if event.get("registration_note"):
+                    st.markdown(event["registration_note"])
+                if event.get("notes"):
+                    st.markdown(event["notes"])
 
 
 def main() -> None:
