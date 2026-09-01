@@ -63,7 +63,8 @@ def show_event_card(event: dict) -> None:
     """1件の開催情報をカード形式で表示する。"""
     color = _BADGE_COLORS.get(event["event_type"], "gray")
     with st.container(border=True):
-        st.markdown(f"**{event['name']}** :{color}-badge[{event['event_type']}]")
+        title = f"~~{event['name']}~~" if event.get("is_cancelled") else f"**{event['name']}**"
+        st.markdown(f"{title} :{color}-badge[{event['event_type']}]")
 
         info_lines = [f"開催日: {_format_date_range(event)}"]
         if event.get("organizer_name"):
@@ -80,6 +81,8 @@ def show_event_card(event: dict) -> None:
             st.success(status_label, icon="✅")
         elif status_kind == "info":
             st.info(status_label, icon="⏳")
+        elif status_kind == "error":
+            st.error(status_label, icon="🚫")
         else:
             st.caption(status_label)
 

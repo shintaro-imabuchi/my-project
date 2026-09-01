@@ -43,7 +43,10 @@ def show_events_list() -> None:
             with col_info:
                 prefix = "✏️ " if event["id"] == selected_id else ""
                 unpublished = "　:gray-badge[非公開]" if not event.get("registration_open") else ""
-                st.markdown(f"{prefix}**{event['name']}**　（{event['event_type']}）{unpublished}")
+                cancelled = "　:red-badge[開催中止]" if event.get("is_cancelled") else ""
+                st.markdown(
+                    f"{prefix}**{event['name']}**　（{event['event_type']}）{unpublished}{cancelled}"
+                )
                 date_range = event["event_date"]
                 end_date = event.get("event_end_date")
                 if end_date and end_date != event["event_date"]:
@@ -101,6 +104,10 @@ def show_event_form(defaults: dict, event_id: int | None) -> None:
         registration_open = st.checkbox(
             "掲載する（公開一覧に表示）", value=defaults.get("registration_open", True)
         )
+        is_cancelled = st.checkbox(
+            "開催中止（一覧には残すが「開催中止」と表示する）",
+            value=defaults.get("is_cancelled", False),
+        )
         registration_url = st.text_input(
             "登録サイトURL", value=defaults.get("registration_url") or ""
         )
@@ -126,6 +133,7 @@ def show_event_form(defaults: dict, event_id: int | None) -> None:
             "registration_opens_on": opens_on_val.isoformat() if opens_on_val else None,
             "registration_deadline": deadline_val.isoformat() if deadline_val else None,
             "registration_open": registration_open,
+            "is_cancelled": is_cancelled,
             "registration_url": registration_url or None,
             "registration_note": registration_note or None,
             "notes": notes or None,

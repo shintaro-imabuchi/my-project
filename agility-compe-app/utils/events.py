@@ -8,8 +8,9 @@ EVENT_TYPES: list[str] = ["公式競技会", "練習会", "壮行会", "セミ�
 
 # get_event_status()が返しうる全ラベル（表示・絞り込みの選択肢の並び順）。
 # デフォルトでは「開催終了」だけ選択解除しておく（過去のイベントを見たい
-# 場合は手動で選択できるようにする）。
-STATUS_LABELS: list[str] = ["申込期間中", "申込期間前", "申込期間未定", "申込期間終了", "開催中", "開催終了"]
+# 場合は手動で選択できるようにする）。「開催中止」は見落とし防止のため
+# デフォルトON。
+STATUS_LABELS: list[str] = ["申込期間中", "申込期間前", "申込期間未定", "申込期間終了", "開催中止", "開催中", "開催終了"]
 STATUS_DEFAULT_SELECTED: list[str] = [s for s in STATUS_LABELS if s != "開催終了"]
 
 JKC_EXPORT_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "jkc_events_export.json")
@@ -178,7 +179,13 @@ def get_event_status(event: dict) -> tuple[str, str]:
     掲載ON/OFF（registration_open）はここでは見ない。公開一覧に載せるか
     どうかだけを決める別の役割のため、get_events(published_only=True)側で
     絞り込む。
+
+    開催中止（is_cancelled）は上記のどの判定よりも優先し、無条件で
+    「開催中止」を返す（管理画面から手動でトグルする想定）。
     """
+    if event.get("is_cancelled"):
+        return "error", "開催中止"
+
     today = date.today()
     event_start = _to_date(event["event_date"])
     event_end = _to_date(event.get("event_end_date")) or event_start
