@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import date
+from datetime import date, timedelta
 
 from supabase_client import get_supabase
 
@@ -210,3 +210,154 @@ def get_event_status(event: dict) -> tuple[str, str]:
     if today > effective_deadline:
         return "caption", "申込期間終了"
     return "success", "申込期間中"
+
+
+# ============================================================
+# 申込リマインド「Facebook投稿下書き」機能
+#
+# 個別ユーザーへのメール配信ではなく、管理者(今渕さん)がFacebook
+# グループ/ページに手動でコピペ投稿する運用。そのため会員登録・認証は
+# 不要で、「(イベント, マイルストーン)の組み合わせごとに、まだ下書きを
+# 出していないものを一覧表示する」だけのシンプルな仕組みにしてある。
+# ============================================================
+
+_CONFIRMED_MILESTONES = [
+    ("confirmed_3w", 21, "申込開始3週間以内"),
+    ("confirmed_2w", 14, "申込開始2週間以内"),
+    ("confirmed_1w", 7, "申込開始1週間以内"),
+    ("confirmed_2d", 2, "申込開始2日以内"),
+    ("confirmed_open", 0, "申込受付開始"),
+]
+_TENTATIVE_MILESTONES = [
+    ("tentative_1_5m", 45, "開催1.5か月以内"),
+    ("tentative_1m", 30, "開催1か月以内"),
+]
+
+
+def _event_milestones(event: dict) -> list[tuple[str, date, str]]:
+    """イベントに適用すべき (milestone_key, 目標日, ラベル) のリストを返す。
+
+    申込開始日(registration_opens_on)が登録済みのイベントは開始日起点、
+    未登録（申込期間未定）のイベントは開催日起点のマイルストーンを使う。
+    get_event_status()の「申込期間未定」判定とは異なり、締切日の有無は
+    見ない（開始日が無ければ常に未定パターン扱い）。
+
+    確定パターンの最後の項目(confirmed_open、目標日=開始日そのもの)は
+    「ただいま申込受付中です」の告知用。開始日を過ぎてもこれが候補に残る
+    ことで、get_due_facebook_drafts()側の「最も本日に近いものを採用する」
+    ロジックにより、開始前カウントダウンの代わりに受付中の告知が選ばれる。
+    ただし締切(なければ開催日)を過ぎたら、これ以上の告知は無意味なので
+    候補自体を返さない(空リスト)。この状態は公開一覧側の「申込期間終了」
+    表示で十分に伝わる。
+    """
+    opens_on = _to_date(event.get("registration_opens_on"))
+    event_date = _to_date(event["event_date"])
+    if opens_on:
+        effective_deadline = _to_date(event.get("registration_deadline")) or event_date
+        if date.today() > effective_deadline:
+            return []
+        return [
+            (key, opens_on - timedelta(days=days), label)
+            for key, days, label in _CONFIRMED_MILESTONES
+        ]
+    return [
+        (key, event_date - timedelta(days=days), label)
+        for key, days, label in _TENTATIVE_MILESTONES
+    ]
+
+
+def build_draft_text(event: dict, milestone_key: str, label: str) -> str:
+    """Facebook投稿用の下書き文面を組み立てる。"""
+    date_range = event["event_date"]
+    end = event.get("event_end_date")
+    if end and end != event["event_date"]:
+        date_range += f"〜{end}"
+
+    lines = [f"📢 {event['name']}", f"開催日: {date_range}"]
+    if event.get("venue"):
+        lines.append(f"会場: {event['venue']}")
+    if event.get("organizer_name"):
+        lines.append(f"主催: {event['organizer_name']}")
+
+    if milestone_key == "confirmed_open":
+        deadline = event.get("registration_deadline")
+        lines.append(
+            f"🎉 ただいま申込受付中です！　申込開始日: {event.get('registration_opens_on')}"
+            + (f"　締切: {deadline}" if deadline else "")
+        )
+    elif milestone_key.startswith("confirmed_"):
+        lines.append(f"⏰ {label}です！　申込開始日: {event.get('registration_opens_on')}")
+    else:
+        lines.append(f"📅 {label}になりました。申込期間はまだ未公開です。")
+
+    guideline_url = event.get("guideline_url")
+    if guideline_url:
+        lines.append(f"詳細: {guideline_url}")
+    return "\n".join(lines)
+
+
+def get_due_facebook_drafts() -> list[dict]:
+    """本日時点の状況スナップショットとして表示すべきFacebook下書きの一覧を返す。
+
+    公開一覧に載っている(掲載ON)全種別のイベントが対象。開催中止・開催日を
+    過ぎたイベントは対象外。
+
+    「一度出したら二度と出さない」通知ではなく、「今その時点で該当する
+    イベントの状況を毎回まとめて表示する」ためのもの。そのため投稿済み
+    管理は行わない — 管理者が任意のタイミングで何度でも見返し、その都度
+    Facebookに投稿してよい(前回投稿した内容と重複しても構わない)。
+
+    1イベントにつき候補は最大1件: 複数のマイルストーンが同時に「本日以前」
+    になっていても、そのうち最も本日に近い(=一番遅い目標日の)ものだけを
+    採用する(例: 3週間前を見逃していても、2週間前の方が新しければそちらを
+    表示する)。
+
+    戻り値は開催日の近い順(1つの投稿にまとめて読んだときに自然な並びに
+    なるよう)。各要素:
+    {"event": dict, "milestone_key": str, "target_date": date, "label": str,
+     "draft_text": str}
+    """
+    today = date.today()
+    events = get_events(published_only=True)
+
+    due = []
+    for event in events:
+        if event.get("is_cancelled"):
+            continue
+        event_date = _to_date(event["event_date"])
+        if event_date < today:
+            continue
+        due_so_far = [m for m in _event_milestones(event) if m[1] <= today]
+        if not due_so_far:
+            continue
+        milestone_key, target_date, label = max(due_so_far, key=lambda m: m[1])
+        due.append(
+            {
+                "event": event,
+                "milestone_key": milestone_key,
+                "target_date": target_date,
+                "label": label,
+                "draft_text": build_draft_text(event, milestone_key, label),
+            }
+        )
+    due.sort(key=lambda d: d["event"]["event_date"])
+    return due
+
+
+_EVENTS_SITE_URL = "https://dog-agility-events.streamlit.app/"
+
+
+def _draft_header() -> str:
+    today = date.today()
+    return (
+        "申込を忘れてしまわないように。#アジリティー #agility\n"
+        f"{today.month}月{today.day}日現在の申込期間状況。\n"
+        f"詳細は {_EVENTS_SITE_URL}"
+    )
+
+
+def build_combined_draft_text(drafts: list[dict]) -> str:
+    """複数イベント分の下書きを、冒頭の定型文に続けて渡された順序のまま
+    区切り線でつなぎ、1つのFacebook投稿用テキストにまとめる。"""
+    body = "\n\n――――――――――\n\n".join(d["draft_text"] for d in drafts)
+    return f"{_draft_header()}\n\n{body}"

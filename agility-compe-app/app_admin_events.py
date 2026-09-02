@@ -6,7 +6,9 @@ from utils.ai_event_parser import parse_event_with_ai
 from utils.events import (
     EVENT_TYPES,
     apply_jkc_import,
+    build_combined_draft_text,
     delete_event,
+    get_due_facebook_drafts,
     get_events,
     insert_event,
     load_jkc_export,
@@ -252,6 +254,36 @@ def show_jkc_import() -> None:
             st.rerun()
 
 
+def show_facebook_drafts() -> None:
+    """申込リマインドのFacebook投稿下書き（本日時点の状況スナップショット）。
+
+    個別ユーザーへの配信ではなく、管理者がコピペしてFacebookグループ/ページへ
+    手動投稿する運用のための下書き生成UI。「今その時点の状況」を毎回まとめて
+    見せるだけなので、投稿済み管理は行わない（何度見返して何度投稿してもよい）。
+    """
+    st.markdown("##### 📋 Facebook投稿下書き")
+    try:
+        drafts = get_due_facebook_drafts()
+    except Exception as e:
+        st.error(f"下書きの取得に失敗しました: {e}")
+        return
+
+    if not drafts:
+        st.caption("本日時点で該当するイベントはありません。")
+        return
+
+    st.caption(
+        f"{len(drafts)}件のイベントを開催日が近い順にまとめた、本日時点の状況案です。"
+        "文面をコピーしてFacebookに投稿してください（何度でも見返して構いません）。"
+    )
+    with st.expander(f"対象イベント（{len(drafts)}件）", expanded=False):
+        for d in drafts:
+            st.caption(f"・{d['event']['name']}　（{d['label']}）")
+
+    st.caption("右上のアイコンをクリックすると、投稿文全体をそのままコピーできます。")
+    st.code(build_combined_draft_text(drafts), language=None, wrap_lines=True)
+
+
 def show_events_management() -> None:
     """開催情報一覧の管理UI（一覧・編集・削除・新規登録・AI読み取り・JKC取り込み）を表示する。"""
     st.markdown("#### 開催情報管理")
@@ -259,6 +291,8 @@ def show_events_management() -> None:
     if "flash_admin_event" in st.session_state:
         st.success(st.session_state.pop("flash_admin_event"))
 
+    show_facebook_drafts()
+    st.divider()
     show_events_list()
 
     selected_event = st.session_state.get("selected_event")
