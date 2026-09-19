@@ -249,6 +249,12 @@ def _event_milestones(event: dict) -> list[tuple[str, date, str]]:
     ただし締切(なければ開催日)を過ぎたら、これ以上の告知は無意味なので
     候補自体を返さない(空リスト)。この状態は公開一覧側の「申込期間終了」
     表示で十分に伝わる。
+
+    未定パターン(申込開始日が未登録)には「受付中」に相当する最終告知が
+    無いため、確定パターンと同様に開催日を過ぎたら(=開催当日も含む)
+    空リストを返す。これが無いと、申込期間が最後まで公開されなかった
+    イベントが、開催当日・開催後もずっと「開催1か月以内になりました」の
+    ような古い告知のまま表示され続けてしまう。
     """
     opens_on = _to_date(event.get("registration_opens_on"))
     event_date = _to_date(event["event_date"])
@@ -260,6 +266,8 @@ def _event_milestones(event: dict) -> list[tuple[str, date, str]]:
             (key, opens_on - timedelta(days=days), label)
             for key, days, label in _CONFIRMED_MILESTONES
         ]
+    if date.today() >= event_date:
+        return []
     return [
         (key, event_date - timedelta(days=days), label)
         for key, days, label in _TENTATIVE_MILESTONES
