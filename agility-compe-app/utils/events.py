@@ -284,7 +284,11 @@ def build_draft_text(event: dict, milestone_key: str, label: str) -> str:
             + (f"　締切: {deadline}" if deadline else "")
         )
     elif milestone_key.startswith("confirmed_"):
-        lines.append(f"⏰ {label}です！　申込開始日: {event.get('registration_opens_on')}")
+        deadline = event.get("registration_deadline")
+        lines.append(
+            f"⏰ {label}です！　申込開始日: {event.get('registration_opens_on')}"
+            + (f"　締切: {deadline}" if deadline else "")
+        )
     else:
         lines.append(f"📅 {label}になりました。申込期間はまだ未公開です。")
 
