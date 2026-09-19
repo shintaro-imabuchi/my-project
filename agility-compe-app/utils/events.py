@@ -276,8 +276,6 @@ def build_draft_text(event: dict, milestone_key: str, label: str) -> str:
     lines = [f"📢 {event['name']}", f"開催日: {date_range}"]
     if event.get("venue"):
         lines.append(f"会場: {event['venue']}")
-    if event.get("organizer_name"):
-        lines.append(f"主催: {event['organizer_name']}")
 
     if milestone_key == "confirmed_open":
         deadline = event.get("registration_deadline")

@@ -53,9 +53,7 @@ def show_events_list() -> None:
                 end_date = event.get("event_end_date")
                 if end_date and end_date != event["event_date"]:
                     date_range += f" 〜 {end_date}"
-                st.caption(
-                    f"開催日: {date_range}　／　主催: {event.get('organizer_name') or '-'}"
-                )
+                st.caption(f"開催日: {date_range}")
             with col_edit:
                 if st.button("編集", key=f"event_row_edit_{event['id']}", use_container_width=True):
                     st.session_state["selected_event"] = event
@@ -80,7 +78,6 @@ def show_event_form(defaults: dict, event_id: int | None) -> None:
             else 1
         )
         event_type = st.radio("種別 *", EVENT_TYPES, index=type_idx, horizontal=True)
-        organizer_name = st.text_input("主催者名", value=defaults.get("organizer_name") or "")
         venue = st.text_input("会場", value=defaults.get("venue") or "")
 
         col1, col2 = st.columns(2)
@@ -128,7 +125,6 @@ def show_event_form(defaults: dict, event_id: int | None) -> None:
         data = {
             "name": name,
             "event_type": event_type,
-            "organizer_name": organizer_name or None,
             "venue": venue or None,
             "event_date": event_date_val.isoformat(),
             "event_end_date": event_end_date_val.isoformat() if event_end_date_val else None,

@@ -67,8 +67,6 @@ def show_event_card(event: dict) -> None:
         st.markdown(f"{title} :{color}-badge[{event['event_type']}]")
 
         info_lines = [f"開催日: {_format_date_range(event)}"]
-        if event.get("organizer_name"):
-            info_lines.append(f"主催: {event['organizer_name']}")
         if event.get("venue"):
             info_lines.append(f"会場: {event['venue']}")
         registration_period = _format_registration_period(event)

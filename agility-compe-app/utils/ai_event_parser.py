@@ -27,7 +27,6 @@ class EventExtraction(BaseModel):
 
     name: str | None = None
     event_type: str | None = None
-    organizer_name: str | None = None
     venue: str | None = None
     event_date: str | None = None
     event_end_date: str | None = None
