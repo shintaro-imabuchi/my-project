@@ -63,6 +63,31 @@ my-app/
 3. Secrets管理画面で環境変数を設定
 4. 自動デプロイされることを確認
 
+# 新規テーブル作成時の注意（Data API Grant）
+- Supabaseは2026-10-30以降、publicスキーマに新規作成したテーブルへのData API
+  （supabase-js・PostgREST・GraphQL・本アプリが使うsupabase-py経由の
+  `get_supabase().table(...)` も含む）アクセスを自動付与しなくなる
+  （既存テーブルは現状のGRANTを維持するため無影響）
+- そのため、これ以降`CREATE TABLE`するSQLには、テーブル作成と同じ
+  マイグレーション内に必ず以下のGRANT文をセットで入れること
+  （入れ忘れるとそのテーブルだけData APIから`permission denied`になる）:
+  ```sql
+  grant select
+  on public.<table_name>
+  to anon;
+
+  grant select, insert, update, delete
+  on public.<table_name>
+  to authenticated;
+
+  grant select, insert, update, delete
+  on public.<table_name>
+  to service_role;
+  ```
+- RLSポリシー（`ENABLE ROW LEVEL SECURITY` + `CREATE POLICY`）は上記GRANTとは
+  別物で、これまで通り必須。GRANTは「APIから到達できるか」、RLSは「到達した後
+  何ができるか」を制御する
+
 # 注意事項
 - secrets.toml は絶対にGitにコミットしない（.gitignoreで除外済み）
 - Supabaseのservice_role keyは使わず anon key を使う
