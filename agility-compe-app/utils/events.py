@@ -132,6 +132,44 @@ def preview_jkc_import(records: list[dict]) -> list[dict]:
     return result
 
 
+def find_orphaned_jkc_events(records: list[dict]) -> list[dict]:
+    """取り込み対象に含まれなくなった、supersededな既存レコードを探す。
+
+    `agility-events`側でレコードのid（source_id）が変わるケース（例: 開催日
+    変更でidに日付が入っている命名規則のレコードを作り直した場合）では、
+    新idのレコードはpreview_jkc_importで「新規」としてinsertされる一方、
+    旧idのレコードはeventsテーブルに残り続けてしまう（このインポート処理は
+    upsertのみでdeleteを行わないため）。結果として同じイベントが新旧2件、
+    重複して公開一覧に表示され続けるバグになる。
+
+    ここでは「source_idが設定されている（＝JKC取り込み由来の）既存レコードの
+    うち、今回のエクスポートに同じsource_idが存在しないもの」を削除候補として
+    返す。手動作成でsource_idが無いレコードは対象にしない（誤って一般イベント
+    を消さないため）。自動削除はせず、UI側で確認の上ユーザーが明示的に削除する
+    運用とする。
+    """
+    existing_list = (
+        get_supabase()
+        .table("events")
+        .select("id, source_id, name, event_date, event_end_date")
+        .execute()
+        .data
+    )
+    current_source_ids = {r.get("source_id") for r in records if r.get("source_id")}
+    return [
+        e
+        for e in existing_list
+        if e.get("source_id") and e["source_id"] not in current_source_ids
+    ]
+
+
+def apply_jkc_deletions(event_ids: list[int]) -> int:
+    """指定したidのイベントをeventsテーブルから削除する。戻り値は削除件数。"""
+    for event_id in event_ids:
+        get_supabase().table("events").delete().eq("id", event_id).execute()
+    return len(event_ids)
+
+
 def apply_jkc_import(records: list[dict]) -> int:
     """取り込み対象レコードをeventsテーブルへ反映する。
 

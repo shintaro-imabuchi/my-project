@@ -5,9 +5,11 @@ import streamlit as st
 from utils.ai_event_parser import parse_event_with_ai
 from utils.events import (
     EVENT_TYPES,
+    apply_jkc_deletions,
     apply_jkc_import,
     build_combined_draft_text,
     delete_event,
+    find_orphaned_jkc_events,
     get_due_facebook_drafts,
     get_events,
     insert_event,
@@ -210,8 +212,10 @@ def show_jkc_import() -> None:
         if records is None:
             st.warning("取り込みファイル（data/jkc_events_export.json）が見つかりません。")
             st.session_state.pop("jkc_preview", None)
+            st.session_state.pop("jkc_orphans", None)
         else:
             st.session_state["jkc_preview"] = preview_jkc_import(records)
+            st.session_state["jkc_orphans"] = find_orphaned_jkc_events(records)
 
     preview = st.session_state.get("jkc_preview")
     if preview:
@@ -247,6 +251,32 @@ def show_jkc_import() -> None:
                 + (f"（要確認{conflict_count}件はスキップ）" if conflict_count else "")
                 + "。"
             )
+            st.rerun()
+
+    orphans = st.session_state.get("jkc_orphans")
+    if orphans:
+        st.warning(
+            f"取り込みファイルに存在しなくなった、JKC取り込み由来のレコードが{len(orphans)}件"
+            "あります。多くは開催日変更などでコレクション側のレコードが作り直された結果、"
+            "古い方がこちらに残ってしまったものです（例: 同じイベントが新旧2つの日付で重複"
+            "表示される）。内容を確認し、不要であれば削除してください。"
+        )
+        st.dataframe(
+            [
+                {
+                    "イベント名": o["name"],
+                    "開催日": o["event_date"],
+                    "終了日": o.get("event_end_date") or "-",
+                }
+                for o in orphans
+            ],
+            hide_index=True,
+            use_container_width=True,
+        )
+        if st.button("この削除候補をすべて削除する", key="jkc_delete_orphans_btn"):
+            count = apply_jkc_deletions([o["id"] for o in orphans])
+            st.session_state.pop("jkc_orphans", None)
+            st.session_state["flash_admin_event"] = f"削除候補を{count}件削除しました。"
             st.rerun()
 
 
