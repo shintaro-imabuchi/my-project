@@ -21,6 +21,12 @@ _BADGE_COLORS: dict[str, str] = {
     "セミナー": "green",
 }
 
+_JKC_SOURCE_NOTICE = (
+    "公式競技会の情報は、JKC（一般社団法人ジャパンケネルクラブ）が公開する"
+    "イベントスケジュールをもとに転載しています。新規イベントの追加や既存イベント"
+    "の変更反映（日程・会場・申込期間など）が遅れる場合があることをご了解ください。"
+)
+
 
 def _format_date(iso_str: str) -> str:
     """ISO形式の日付文字列を表示用文字列にする。"""
@@ -115,14 +121,12 @@ def main() -> None:
     with col_title:
         st.subheader("開催情報一覧")
     with col_date:
-        st.markdown(
-            f"<div style='text-align:right; padding-top:0.8em; color:gray;'>"
-            f"本日: {_format_date(date.today().isoformat())}</div>",
-            unsafe_allow_html=True,
-        )
+        st.caption(f"本日: {_format_date(date.today().isoformat())}")
 
     if st.button("戻る", use_container_width=True):
         st.switch_page("app_entry.py")
+
+    st.info(_JKC_SOURCE_NOTICE, icon="⚠️")
 
     selected_types = st.pills(
         "イベント種別で絞り込み",
