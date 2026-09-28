@@ -7,11 +7,11 @@ from supabase_client import get_supabase
 EVENT_TYPES: list[str] = ["公式競技会", "練習会", "壮行会", "セミナー"]
 
 # get_event_status()が返しうる全ラベル（表示・絞り込みの選択肢の並び順）。
-# デフォルトでは「開催終了」だけ選択解除しておく（過去のイベントを見たい
-# 場合は手動で選択できるようにする）。「開催中止」は見落とし防止のため
-# デフォルトON。
+# デフォルトは申込期間に関する4状態（中・前・未定・終了）のみ選択。
+# 「開催中止」「開催中」「開催終了」は既に結果が確定しているイベントのため、
+# 見たい場合に手動で選択する運用とする。
 STATUS_LABELS: list[str] = ["申込期間中", "申込期間前", "申込期間未定", "申込期間終了", "開催中止", "開催中", "開催終了"]
-STATUS_DEFAULT_SELECTED: list[str] = [s for s in STATUS_LABELS if s != "開催終了"]
+STATUS_DEFAULT_SELECTED: list[str] = ["申込期間中", "申込期間前", "申込期間未定", "申込期間終了"]
 
 JKC_EXPORT_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "jkc_events_export.json")
 

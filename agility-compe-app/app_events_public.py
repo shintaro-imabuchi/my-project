@@ -128,7 +128,7 @@ def main() -> None:
         "イベント種別で絞り込み",
         options=EVENT_TYPES,
         selection_mode="multi",
-        default=EVENT_TYPES,
+        default=["公式競技会"],
     ) or []
 
     selected_statuses = st.pills(
