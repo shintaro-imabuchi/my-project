@@ -3,6 +3,11 @@ name: Keep Streamlit Apps Awake
 on:
   # 2026-08-14: Supabaseスキーマの作り直し作業のため定期実行を一時停止。
   # 2026-08-28: マルチテナント化改修が一段落したため再開。
+  # 2026-09-29: 開催情報一覧（旧APP_EVENTS_URL）をStreamlit→Render静的サイトに
+  # 移行したのに伴い「Keep events public site awake」ステップを削除。静的サイトは
+  # ビルド時にしかSupabaseへ接続しないためpingしても無意味（かつ常時起動でスリープ
+  # 自体しない）。Supabaseの7日間pause防止は残り2ステップ（staff/entry、いずれも
+  # Streamlit+Supabase接続が生きている）で引き続きカバーされる。
   schedule:
     - cron: '0 1 * * *'   # UTC  1:00 (JST 10:00)
     - cron: '0 9 * * *'   # UTC  9:00 (JST 18:00)
@@ -36,8 +41,3 @@ jobs:
         env:
           APP_ENTRY_URL: ${{ secrets.APP_ENTRY_URL }}
         run: python agility-compe-app/scripts/auto_login_entry.py
-
-      - name: Keep events public site awake
-        env:
-          APP_EVENTS_URL: ${{ secrets.APP_EVENTS_URL }}
-        run: python agility-compe-app/scripts/auto_login_events.py
