@@ -12,6 +12,9 @@ __pycache__/
 # Streamlit
 .streamlit/cache/
 
+# 静的サイト生成物（ビルドのたびに再生成）
+static_site/dist/
+
 # OS
 .DS_Store
 Thumbs.db

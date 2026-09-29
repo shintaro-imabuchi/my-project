@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>犬のアジリティー 開催情報一覧 | JKC公式競技会・練習会情報</title>
+<meta name="description" content="JKC公式競技会をはじめ、犬のアジリティー競技会・練習会・壮行会・セミナーの開催日・会場・申込期間をまとめて確認できます。">
+<link rel="canonical" href="{{ site_url }}">
+<meta property="og:title" content="犬のアジリティー 開催情報一覧">
+<meta property="og:description" content="JKC公式競技会をはじめ、犬のアジリティー競技会・練習会・壮行会・セミナーの開催日・会場・申込期間をまとめて確認できます。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{ site_url }}">
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+<div class="page">
+  <header class="page-header">
+    <div class="title-row">
+      <h1>犬のアジリティー 開催情報一覧</h1>
+      <span class="today">本日: {{ today }}</span>
+    </div>
+    <p class="lead">公式競技会・練習会・壮行会・セミナーの開催情報をまとめています。</p>
+    <p class="notice">⚠️ {{ jkc_source_notice }}</p>
+  </header>
+
+  <section class="filters">
+    <fieldset class="filter-group">
+      <legend>イベント種別で絞り込み</legend>
+      {% for event_type in event_types %}
+      <label class="filter-pill">
+        <input type="checkbox" class="filter-event-type" value="{{ event_type }}"
+          {% if event_type in default_event_types %}checked{% endif %}>
+        {{ event_type }}
+      </label>
+      {% endfor %}
+    </fieldset>
+
+    <fieldset class="filter-group">
+      <legend>受付状況で絞り込み</legend>
+      {% for status_label in status_labels %}
+      <label class="filter-pill">
+        <input type="checkbox" class="filter-status" value="{{ status_label }}"
+          {% if status_label in default_status_labels %}checked{% endif %}>
+        {{ status_label }}
+      </label>
+      {% endfor %}
+    </fieldset>
+  </section>
+
+  <section id="event-list" class="event-list">
+    {% for card in cards %}
+    <article class="event-card" data-event-type="{{ card.event_type }}" data-status-label="{{ card.status_label }}">
+      <div class="event-title-row">
+        <span class="event-name{% if card.is_cancelled %} cancelled{% endif %}">{{ card.name }}</span>
+        <span class="badge badge-{{ card.badge_color }}">{{ card.event_type }}</span>
+      </div>
+      <p class="event-info">
+        開催日: {{ card.date_range }}
+        {% if card.venue %}<br>会場: {{ card.venue }}{% endif %}
+        {% if card.registration_period %}<br>申込期間: {{ card.registration_period }}{% endif %}
+      </p>
+      <p class="status-label {{ card.status_class }}">{{ card.status_label }}</p>
+      {% if card.guideline_url %}
+      <a class="btn" href="{{ card.guideline_url }}" target="_blank" rel="noopener">開催要項を見る</a>
+      {% endif %}
+      {% if card.registration_url %}
+      <a class="btn" href="{{ card.registration_url }}" target="_blank" rel="noopener">参加登録はこちら</a>
+      <p class="caption">※別サイトに移動します。</p>
+      {% endif %}
+      {% if card.no_url %}
+      <p class="caption">詳細・申込方法は主催者にお問い合わせください。</p>
+      {% endif %}
+      {% if card.registration_note or card.notes %}
+      <details class="event-details">
+        <summary>詳細を見る</summary>
+        {% if card.registration_note %}<p>{{ card.registration_note }}</p>{% endif %}
+        {% if card.notes %}<p>{{ card.notes }}</p>{% endif %}
+      </details>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </section>
+
+  <p id="no-match" class="no-match" hidden>該当するイベントがありません。</p>
+</div>
+<script src="static/filter.js"></script>
+</body>
+</html>
