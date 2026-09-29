@@ -392,7 +392,7 @@ def get_due_facebook_drafts() -> list[dict]:
     return due
 
 
-_EVENTS_SITE_URL = "https://dog-agility-events.streamlit.app/"
+_EVENTS_SITE_URL = "https://agility-events.puffin.tokyo.jp/"
 
 
 def _draft_header() -> str:
