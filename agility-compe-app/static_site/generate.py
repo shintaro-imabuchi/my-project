@@ -22,8 +22,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from utils.events import (  # noqa: E402
     EVENT_TYPES,
-    STATUS_DEFAULT_SELECTED,
-    STATUS_LABELS,
     get_event_status,
 )
 
@@ -50,6 +48,17 @@ _JKC_SOURCE_NOTICE = (
     "イベントスケジュールをもとに転載しています。新規イベントの追加や既存イベント"
     "の変更反映（日程・会場・申込期間など）が遅れる場合があることをご了解ください。"
 )
+
+# このサイト（一般公開・SEO流入を想定）は、想定ユーザーにシンプルに使ってもらうため、
+# utils.events.STATUS_LABELS（内部向けpages/03_events.pyが使う全7状態）より絞った
+# 3状態だけをフィルタ選択肢として出す。2026-10-09のユーザー方針により決定。
+_PUBLIC_STATUS_LABELS = ["申込期間中", "申込期間前", "申込期間未定"]
+_PUBLIC_DEFAULT_STATUS_LABELS = ["申込期間中", "申込期間前"]
+
+# 上記以外の状態（受付終了・結果が確定済みのイベント）は、一覧に出す意味が薄いため
+# 生成データ自体から除外する（MulmoClaude側のagility-eventsコレクションや
+# Supabaseの行自体は消さず、このサイトの表示対象からだけ除外する）。
+_EXCLUDED_STATUS_LABELS = {"申込期間終了", "開催中止", "開催中", "開催終了"}
 
 
 def get_supabase() -> Client:
@@ -146,9 +155,9 @@ def render_site(cards: list[dict]) -> str:
         today=_format_date(date.today().isoformat()),
         jkc_source_notice=_JKC_SOURCE_NOTICE,
         event_types=EVENT_TYPES,
-        status_labels=STATUS_LABELS,
+        status_labels=_PUBLIC_STATUS_LABELS,
         default_event_types=["公式競技会"],
-        default_status_labels=STATUS_DEFAULT_SELECTED,
+        default_status_labels=_PUBLIC_DEFAULT_STATUS_LABELS,
         site_url=_SITE_URL,
     )
 
@@ -157,6 +166,7 @@ def main() -> None:
     """開催情報一覧の静的サイトをdist/に生成する。"""
     events = get_published_events()
     cards = [build_card(e) for e in _sort_by_proximity(events)]
+    cards = [c for c in cards if c["status_label"] not in _EXCLUDED_STATUS_LABELS]
 
     os.makedirs(_DIST_DIR, exist_ok=True)
     html = render_site(cards)
