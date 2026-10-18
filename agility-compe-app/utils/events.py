@@ -1,5 +1,3 @@
-import json
-import os
 from datetime import date, timedelta
 
 from supabase_client import get_supabase
@@ -12,8 +10,6 @@ EVENT_TYPES: list[str] = ["公式競技会", "練習会", "壮行会", "セミ�
 # 見たい場合に手動で選択する運用とする。
 STATUS_LABELS: list[str] = ["申込期間中", "申込期間前", "申込期間未定", "申込期間終了", "開催中止", "開催中", "開催終了"]
 STATUS_DEFAULT_SELECTED: list[str] = ["申込期間中", "申込期間前", "申込期間未定", "申込期間終了"]
-
-JKC_EXPORT_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "jkc_events_export.json")
 
 
 def get_events(event_types: list[str] | None = None, published_only: bool = False) -> list[dict]:
@@ -46,151 +42,6 @@ def update_event(event_id: int, data: dict) -> None:
 def delete_event(event_id: int) -> None:
     """イベントをeventsテーブルから削除する。"""
     get_supabase().table("events").delete().eq("id", event_id).execute()
-
-
-def load_jkc_export() -> list[dict] | None:
-    """MulmoClaude（agility-eventsコレクション）が書き出したJKC取り込み用
-    エクスポートファイルを読み込む。ファイルが存在しなければNoneを返す。
-    """
-    if not os.path.exists(JKC_EXPORT_PATH):
-        return None
-    with open(JKC_EXPORT_PATH, encoding="utf-8") as f:
-        return json.load(f)
-
-
-def _normalize_name(name: str) -> str:
-    """イベント名比較用に、半角/全角スペース等の表記ゆれを吸収する。"""
-    return name.replace(" ", "").replace("　", "")
-
-
-def _find_existing_match(record: dict, existing_by_source_id: dict, existing_list: list[dict]) -> dict | None:
-    """1件のインポート候補に対応する既存eventsレコードを探す。
-
-    1. source_idが一致すればそれを使う
-    2. 一致しなければ、イベント名が同じ（空白の有無は無視）で、
-       インポート候補のevent_dateが既存レコードの開催期間
-       （event_date〜event_end_date）に含まれるものを探す
-       （source_id導入前に手動登録された既存データや、複数日イベントの
-       表現方法の違いを吸収するため）
-    """
-    source_id = record.get("source_id")
-    if source_id and source_id in existing_by_source_id:
-        return existing_by_source_id[source_id]
-
-    r_date = record["event_date"]
-    r_name = _normalize_name(record["name"])
-    for e in existing_list:
-        if _normalize_name(e["name"]) != r_name:
-            continue
-        e_start = e["event_date"]
-        e_end = e.get("event_end_date") or e_start
-        if e_start <= r_date <= e_end:
-            return e
-    return None
-
-
-def preview_jkc_import(records: list[dict]) -> list[dict]:
-    """取り込み対象レコードに、新規登録/更新/要確認の区別（_action）を付けて返す。
-
-    - source_id一致、または名前＋開催期間の一致 → 「更新」
-    - どちらにも一致しない → 「新規」
-    - 複数のインポート候補が同じ既存レコードに一致してしまった場合は、
-      片方だけ反映すると開催期間などの情報が失われる恐れがあるため、
-      該当する全件を「要確認（重複）」とし、自動反映の対象から外す
-      （例: コレクション側は複数日イベントを日ごとに別レコードで管理し、
-      Supabase側は1レコードにまとめている、という表現の違いがある場合）
-    """
-    existing_list = (
-        get_supabase()
-        .table("events")
-        .select("id, source_id, name, event_date, event_end_date")
-        .execute()
-        .data
-    )
-    existing_by_source_id = {e["source_id"]: e for e in existing_list if e.get("source_id")}
-
-    result = []
-    matched_existing_ids: dict[int, int] = {}
-    for r in records:
-        r = dict(r)
-        matched = _find_existing_match(r, existing_by_source_id, existing_list)
-        if matched:
-            r["_action"] = "更新"
-            r["_existing_id"] = matched["id"]
-            matched_existing_ids[matched["id"]] = matched_existing_ids.get(matched["id"], 0) + 1
-        else:
-            r["_action"] = "新規"
-            r["_existing_id"] = None
-        result.append(r)
-
-    # 同じ既存レコードに複数のインポート候補が一致した場合は「要確認（重複）」に変更
-    for r in result:
-        existing_id = r.get("_existing_id")
-        if existing_id and matched_existing_ids.get(existing_id, 0) > 1:
-            r["_action"] = "要確認（重複）"
-
-    return result
-
-
-def find_orphaned_jkc_events(records: list[dict]) -> list[dict]:
-    """取り込み対象に含まれなくなった、supersededな既存レコードを探す。
-
-    `agility-events`側でレコードのid（source_id）が変わるケース（例: 開催日
-    変更でidに日付が入っている命名規則のレコードを作り直した場合）では、
-    新idのレコードはpreview_jkc_importで「新規」としてinsertされる一方、
-    旧idのレコードはeventsテーブルに残り続けてしまう（このインポート処理は
-    upsertのみでdeleteを行わないため）。結果として同じイベントが新旧2件、
-    重複して公開一覧に表示され続けるバグになる。
-
-    ここでは「source_idが設定されている（＝JKC取り込み由来の）既存レコードの
-    うち、今回のエクスポートに同じsource_idが存在しないもの」を削除候補として
-    返す。手動作成でsource_idが無いレコードは対象にしない（誤って一般イベント
-    を消さないため）。自動削除はせず、UI側で確認の上ユーザーが明示的に削除する
-    運用とする。
-    """
-    existing_list = (
-        get_supabase()
-        .table("events")
-        .select("id, source_id, name, event_date, event_end_date")
-        .execute()
-        .data
-    )
-    current_source_ids = {r.get("source_id") for r in records if r.get("source_id")}
-    return [
-        e
-        for e in existing_list
-        if e.get("source_id") and e["source_id"] not in current_source_ids
-    ]
-
-
-def apply_jkc_deletions(event_ids: list[int]) -> int:
-    """指定したidのイベントをeventsテーブルから削除する。戻り値は削除件数。"""
-    for event_id in event_ids:
-        get_supabase().table("events").delete().eq("id", event_id).execute()
-    return len(event_ids)
-
-
-def apply_jkc_import(records: list[dict]) -> int:
-    """取り込み対象レコードをeventsテーブルへ反映する。
-
-    「更新」は該当する既存レコード（id）をupdate、「新規」はinsertする。
-    「要確認（重複）」は自動反映せずスキップする。
-    掲載ON/OFF（registration_open）は常にTrueで取り込む。
-    戻り値は反映した件数。
-    """
-    count = 0
-    for r in records:
-        if r.get("_action") == "要確認（重複）":
-            continue
-        data = {k: v for k, v in r.items() if not k.startswith("_") and v is not None}
-        data["registration_open"] = True
-        existing_id = r.get("_existing_id")
-        if existing_id:
-            get_supabase().table("events").update(data).eq("id", existing_id).execute()
-        else:
-            get_supabase().table("events").insert(data).execute()
-        count += 1
-    return count
 
 
 def _to_date(value: str | None) -> date | None:
