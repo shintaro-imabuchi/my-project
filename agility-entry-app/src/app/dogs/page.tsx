@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -110,7 +111,12 @@ export default async function DogsPage({
       </ul>
 
       {selectedDog && (
-        <>
+        // key={selectedDog.id}: 犬を切り替えたときに、この中の
+        // defaultValue/defaultChecked を使った入力欄（犬名・犬種・クラス・
+        // 参加種目チェックボックス等）を確実に再初期化するために必要。
+        // keyが無いと、Reactが既存のDOM要素を使い回してしまい、
+        // 別の犬を選んでも前の犬の値が表示されたまま残ってしまう。
+        <Fragment key={selectedDog.id}>
           <hr />
           <section className="flex flex-col gap-3">
             <h2 className="font-semibold">「{selectedDog.dog_name}」を編集</h2>
@@ -217,7 +223,7 @@ export default async function DogsPage({
               </button>
             </form>
           </section>
-        </>
+        </Fragment>
       )}
 
       {!selectedDog && (

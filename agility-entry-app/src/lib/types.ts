@@ -49,4 +49,32 @@ export interface Competition {
   name: string;
   event_fees: EventFee[] | null;
   registration_open: boolean;
+  /** 「開催要綱を見る」ボタンのリンク先（トップ画面） */
+  guideline_url: string | null;
+  /** トップ画面に表示する画像 */
+  top_image_url: string | null;
+  /** 「練習会実施のご案内を見る」ボタンのリンク先（ホーム画面） */
+  notice_url: string | null;
+  /** ホーム画面に表示するお知らせ文 */
+  home_info_message: string | null;
+}
+
+/** RPC get_registration_summary(p_competition_id) の戻り値 */
+export interface RegistrationSummary {
+  entry_count: number;
+  dog_count: number;
+  /** 種目名 → エントリー頭数 */
+  event_counts: Record<string, number>;
+}
+
+/** RPC get_entries_with_dogs(p_competition_id) の1行 */
+export interface EntryWithDog {
+  entry_id: number;
+  dog_id: string;
+  user_id: string;
+  user_name: string | null;
+  dog_name: string;
+  breed: string;
+  dog_class: DogClass;
+  events: string[];
 }

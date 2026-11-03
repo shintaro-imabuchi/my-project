@@ -1,15 +1,22 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getCompetition } from "@/lib/competition";
+import { getCompetition, getLoginMessage } from "@/lib/competition";
 import { logout } from "@/app/logout/actions";
+
+// Streamlit版（pages/03_events.py）の「競技会・練習会などの一覧を見る」に
+// 相当するリンク先。公開開催情報一覧（静的サイト）へ誘導する。
+const EVENTS_LIST_URL = "https://agility-events.puffin.tokyo.jp/";
 
 export default async function HomePage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const competition = await getCompetition();
-  const title = competition?.name ?? "参加登録システム";
+  const [competition, loginMessage] = await Promise.all([
+    getCompetition(),
+    getLoginMessage(),
+  ]);
+  const title = loginMessage || competition?.name || "参加登録システム";
 
   if (!user) {
     return (
@@ -35,6 +42,35 @@ export default async function HomePage() {
             新規登録を締め切りました
           </p>
         )}
+
+        {competition?.guideline_url && (
+          <a
+            href={competition.guideline_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded border px-4 py-3 text-center font-semibold"
+          >
+            開催要綱を見る
+          </a>
+        )}
+
+        <a
+          href={EVENTS_LIST_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded border px-4 py-3 text-center font-semibold"
+        >
+          競技会・練習会などの一覧を見る
+        </a>
+
+        {competition?.top_image_url && (
+          // eslint-disable-next-line @next/next/no-img-element -- 外部URLの動的画像のためnext/imageの設定は省略
+          <img
+            src={competition.top_image_url}
+            alt=""
+            className="w-full rounded"
+          />
+        )}
       </main>
     );
   }
@@ -54,6 +90,30 @@ export default async function HomePage() {
       >
         犬情報の登録・変更・削除
       </Link>
+
+      <Link
+        href="/status"
+        className="rounded border px-4 py-3 text-center font-semibold"
+      >
+        申し込み状況を見る
+      </Link>
+
+      {competition?.notice_url && (
+        <a
+          href={competition.notice_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="rounded border px-4 py-3 text-center font-semibold"
+        >
+          練習会実施のご案内を見る
+        </a>
+      )}
+
+      {competition?.home_info_message && (
+        <p className="rounded border border-blue-300 bg-blue-50 px-4 py-3 text-sm text-blue-900 whitespace-pre-wrap">
+          {competition.home_info_message}
+        </p>
+      )}
 
       <form action={logout}>
         <button
