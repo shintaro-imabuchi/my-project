@@ -167,9 +167,19 @@ def fetch_race_configs() -> list[dict] | None:
 
 
 def upsert_race_config(
-    event: str, dog_class: str, course_len: float, std_time: float, limit_time: float
+    event: str,
+    dog_class: str,
+    course_len: float,
+    std_time: float,
+    limit_time: float,
+    bar_height: float | None,
 ) -> bool:
-    """コース設定をSupabaseにupsertする。"""
+    """コース設定をSupabaseにupsertする。
+
+    bar_height（既定のバーの高さ）は任意項目。未入力（None）の場合は
+    「この種目にはバーの高さの概念がない」とみなされ、参加登録アプリ
+    （Next.js版）側でバーダウン希望のUIが表示されなくなる。
+    """
     try:
         get_supabase().table("race_configs").upsert(
             {
@@ -179,6 +189,7 @@ def upsert_race_config(
                 "course_len": course_len,
                 "std_time": std_time,
                 "limit_time": limit_time,
+                "bar_height": bar_height,
             },
             on_conflict="competition_id,event,dog_class",
         ).execute()
@@ -239,6 +250,7 @@ def show_race_config_input() -> None:
                     "コース全長 (m)": c["course_len"],
                     "標準タイム (sec)": c["std_time"],
                     "リミットタイム (sec)": c["limit_time"],
+                    "バーの高さ (cm)": c.get("bar_height"),
                 }
                 for c in configs
             ],
@@ -273,6 +285,12 @@ def show_race_config_input() -> None:
     with col5:
         limit_time_str = st.text_input("リミットタイム (sec)", value=_str_val("limit_time"), key=f"limit_time_{sfx}")
 
+    bar_height_str = st.text_input(
+        "バーの高さ (cm)　※任意。参加登録アプリのバーダウン希望の基準値になります",
+        value=_str_val("bar_height"),
+        key=f"bar_height_{sfx}",
+    )
+
     cols = st.columns(3) if existing else st.columns(2)
 
     if cols[0].button("保存", type="primary", use_container_width=True, key="config_save"):
@@ -283,18 +301,25 @@ def show_race_config_input() -> None:
         except ValueError:
             st.error("コース全長・標準タイム・リミットタイムは数値で入力してください。")
             return
-        if upsert_race_config(event, dog_class, course_len, std_time, limit_time):
+        bar_height: float | None = None
+        if bar_height_str.strip():
+            try:
+                bar_height = float(bar_height_str)
+            except ValueError:
+                st.error("バーの高さは数値で入力してください（未入力も可）。")
+                return
+        if upsert_race_config(event, dog_class, course_len, std_time, limit_time, bar_height):
             st.success(f"{event} - {dog_class}クラス のコース設定を保存しました。")
             st.rerun()
 
     if cols[1].button("入力を破棄", use_container_width=True, key="config_discard"):
-        for k in [f"course_len_{sfx}", f"std_time_{sfx}", f"limit_time_{sfx}"]:
+        for k in [f"course_len_{sfx}", f"std_time_{sfx}", f"limit_time_{sfx}", f"bar_height_{sfx}"]:
             st.session_state.pop(k, None)
         st.rerun()
 
     if existing and cols[2].button("保存済みを削除", use_container_width=True, key="config_delete"):
         if delete_race_config(event, dog_class):
-            for k in [f"course_len_{sfx}", f"std_time_{sfx}", f"limit_time_{sfx}"]:
+            for k in [f"course_len_{sfx}", f"std_time_{sfx}", f"limit_time_{sfx}", f"bar_height_{sfx}"]:
                 st.session_state.pop(k, None)
             st.success(f"{event} - {dog_class}クラス のコース設定を削除しました。")
             st.rerun()
