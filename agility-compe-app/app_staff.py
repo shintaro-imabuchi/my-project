@@ -169,16 +169,18 @@ def fetch_race_configs() -> list[dict] | None:
 def upsert_race_config(
     event: str,
     dog_class: str,
-    course_len: float,
-    std_time: float,
-    limit_time: float,
+    course_len: float | None,
+    std_time: float | None,
+    limit_time: float | None,
     bar_height: float | None,
 ) -> bool:
     """コース設定をSupabaseにupsertする。
 
-    bar_height（既定のバーの高さ）は任意項目。未入力（None）の場合は
-    「この種目にはバーの高さの概念がない」とみなされ、参加登録アプリ
-    （Next.js版）側でバーダウン希望のUIが表示されなくなる。
+    いずれの数値項目も任意（未入力ならNULL）。種目によってはコース全長や
+    タイムの概念がない場合もあるため、必須にはしていない。
+    bar_height（既定のバーの高さ）が未入力（None）の場合は「この種目には
+    バーの高さの概念がない」とみなされ、参加登録アプリ（Next.js版）側で
+    バーダウン希望のUIが表示されなくなる。
     """
     try:
         get_supabase().table("race_configs").upsert(
@@ -231,6 +233,20 @@ def upsert_race_result(race_config_id: int, entry_id: int, run_time: float, fail
     except Exception as e:
         st.error(f"成績の保存に失敗しました: {e}")
         return False
+
+
+def _parse_optional_float(label: str, value_str: str) -> float | None:
+    """空文字ならNone、そうでなければfloatに変換する。
+
+    変換に失敗した場合は項目名（label）をメッセージに持つValueErrorを送出する
+    （呼び出し側で f"{e}は数値で入力してください" のように使う）。
+    """
+    if not value_str.strip():
+        return None
+    try:
+        return float(value_str)
+    except ValueError:
+        raise ValueError(label) from None
 
 
 def show_race_config_input() -> None:
@@ -295,19 +311,13 @@ def show_race_config_input() -> None:
 
     if cols[0].button("保存", type="primary", use_container_width=True, key="config_save"):
         try:
-            course_len = float(course_len_str)
-            std_time = float(std_time_str)
-            limit_time = float(limit_time_str)
-        except ValueError:
-            st.error("コース全長・標準タイム・リミットタイムは数値で入力してください。")
+            course_len = _parse_optional_float("コース全長", course_len_str)
+            std_time = _parse_optional_float("標準タイム", std_time_str)
+            limit_time = _parse_optional_float("リミットタイム", limit_time_str)
+            bar_height = _parse_optional_float("バーの高さ", bar_height_str)
+        except ValueError as e:
+            st.error(f"{e}は数値で入力してください（未入力も可）。")
             return
-        bar_height: float | None = None
-        if bar_height_str.strip():
-            try:
-                bar_height = float(bar_height_str)
-            except ValueError:
-                st.error("バーの高さは数値で入力してください（未入力も可）。")
-                return
         if upsert_race_config(event, dog_class, course_len, std_time, limit_time, bar_height):
             st.success(f"{event} - {dog_class}クラス のコース設定を保存しました。")
             st.rerun()
