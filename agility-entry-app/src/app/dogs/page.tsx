@@ -196,12 +196,12 @@ export default async function DogsPage({
                       {event}
                     </label>
                     {defaultBarHeight != null && (
-                      <label className="ml-6 flex items-center gap-2 text-sm text-gray-600">
-                        バーダウン希望（既定 {defaultBarHeight}cm）:
+                      <label className="ml-6 flex flex-col gap-1 text-sm text-gray-600">
+                        <span>バーダウン希望（既定 {defaultBarHeight}cm）:</span>
                         <select
                           name={`bardown__${event}`}
                           defaultValue={requestedHeight ?? ""}
-                          className="rounded border px-2 py-1"
+                          className="w-full rounded border px-2 py-1"
                         >
                           <option value="">希望なし（既定の高さ）</option>
                           {options.map((h) => (
