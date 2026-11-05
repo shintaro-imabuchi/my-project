@@ -432,8 +432,60 @@ def show_race_results_input() -> None:
             st.success(f"{selected_label} の成績を保存しました。")
 
 
-def generate_race_schedule_pdf(participants: list[dict], event_fees: dict[str, int]) -> bytes | None:
-    """種目・クラス別出走表をPDF形式で生成してバイト列で返す。対象データなしの場合はNoneを返す。"""
+def _bar_height_map(race_configs: list[dict]) -> dict[tuple[str, str], float | None]:
+    """(種目, クラス) をキーに、既定のバーの高さ(bar_height)を引けるdictを作る。"""
+    return {(c["event"], c["dog_class"]): c.get("bar_height") for c in race_configs}
+
+
+def _effective_bar_height(
+    participant: dict, event: str, bar_height_map: dict[tuple[str, str], float | None]
+) -> float:
+    """出走順の並べ替えに使う「実効バーの高さ」を返す。
+
+    バーダウン希望（entries.bar_down_requests）があればその高さ、無ければ
+    その種目・クラスの既定のバーの高さ（race_configs.bar_height）を使う。
+    どちらも無い（バーの高さの概念が無い種目等）場合は、常に末尾に来るよう
+    無限大を返す（元の並び順＝氏名・登録日時順はソートの安定性により保持される）。
+    """
+    bar_down = (participant.get("bar_down_requests") or {}).get(event)
+    if bar_down is not None:
+        return float(bar_down)
+    default_height = bar_height_map.get((event, participant["dog_class"]))
+    if default_height is not None:
+        return float(default_height)
+    return float("inf")
+
+
+def _bar_down_display(participant: dict, event: str) -> str:
+    """バーダウン希望の表示用文字列を返す。希望が無ければ空文字（表示欄は空欄）。"""
+    bar_down = (participant.get("bar_down_requests") or {}).get(event)
+    return f"{bar_down}cm" if bar_down is not None else ""
+
+
+def _rows_for_event_class(
+    participants: list[dict], event: str, cls: str, bar_height_map: dict[tuple[str, str], float | None]
+) -> list[dict]:
+    """指定の種目・クラスに出陳する参加者を、バーの高さ昇順で返す。
+
+    同じ高さの場合は元の並び順（参加者一覧の取得順＝氏名・登録日時順）を保持する
+    （Pythonのsortedは安定ソートのため）。
+    """
+    rows = [
+        p for p in participants
+        if event in (p.get("events") or []) and p.get("dog_class") == cls
+    ]
+    return sorted(rows, key=lambda p: _effective_bar_height(p, event, bar_height_map))
+
+
+def generate_race_schedule_pdf(
+    participants: list[dict], event_fees: dict[str, int], race_configs: list[dict]
+) -> bytes | None:
+    """種目・クラス別出走表をPDF形式で生成してバイト列で返す。対象データなしの場合はNoneを返す。
+
+    出走順は種目・クラスごとに、バーの高さの昇順（バーダウン希望があればその高さ、
+    無ければ既定のバーの高さ）で決まる。
+    """
+    bar_height_map = _bar_height_map(race_configs)
     pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
     FONT = "HeiseiKakuGo-W5"
 
@@ -444,8 +496,8 @@ def generate_race_schedule_pdf(participants: list[dict], event_fees: dict[str, i
         topMargin=20 * mm, bottomMargin=20 * mm,
     )
     title_style = ParagraphStyle("title", fontName=FONT, fontSize=16, spaceAfter=6 * mm)
-    col_names = ["No.", "氏名", "犬名", "犬種", "クラス"]
-    col_widths = [15 * mm, 45 * mm, 45 * mm, 55 * mm, 20 * mm]
+    col_names = ["No.", "氏名", "犬名", "犬種", "クラス", "バーダウン"]
+    col_widths = [15 * mm, 40 * mm, 40 * mm, 50 * mm, 18 * mm, 22 * mm]
     header_bg = colors.HexColor("#D9E1F2")
 
     story: list = []
@@ -453,10 +505,7 @@ def generate_race_schedule_pdf(participants: list[dict], event_fees: dict[str, i
 
     for event in event_fees:
         for cls in CLASS_ORDER:
-            rows = [
-                p for p in participants
-                if event in (p.get("events") or []) and p.get("dog_class") == cls
-            ]
+            rows = _rows_for_event_class(participants, event, cls, bar_height_map)
             if not rows:
                 continue
 
@@ -466,7 +515,10 @@ def generate_race_schedule_pdf(participants: list[dict], event_fees: dict[str, i
             story.append(Paragraph(f"{event}　{cls}クラス　出走表", title_style))
 
             table_data = [col_names] + [
-                [str(i), p["user_name"], p["dog_name"], p["breed"], p["dog_class"]]
+                [
+                    str(i), p["user_name"], p["dog_name"], p["breed"], p["dog_class"],
+                    _bar_down_display(p, event),
+                ]
                 for i, p in enumerate(rows, start=1)
             ]
             table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -480,7 +532,7 @@ def generate_race_schedule_pdf(participants: list[dict], event_fees: dict[str, i
                 ("TOPPADDING", (0, 0), (-1, -1), 4),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                 ("ALIGN", (0, 0), (0, -1), "CENTER"),
-                ("ALIGN", (4, 0), (4, -1), "CENTER"),
+                ("ALIGN", (4, 0), (5, -1), "CENTER"),
             ]))
             story.append(table)
             created = True
@@ -493,11 +545,19 @@ def generate_race_schedule_pdf(participants: list[dict], event_fees: dict[str, i
 
 
 def show_race_schedule(participants: list[dict]) -> None:
-    """種目別・クラス別の出走表をWeb表示する。"""
+    """種目別・クラス別の出走表をWeb表示する。
+
+    出走順は種目・クラスごとに、バーの高さの昇順（バーダウン希望があれば
+    その高さ、無ければ既定のバーの高さ）で決まる。
+    """
     st.markdown("#### 出走表")
 
     event_fees = get_event_fees()
-    pdf_bytes = generate_race_schedule_pdf(participants, event_fees)
+    with st.spinner("読み込み中..."):
+        race_configs = fetch_race_configs() or []
+    bar_height_map = _bar_height_map(race_configs)
+
+    pdf_bytes = generate_race_schedule_pdf(participants, event_fees, race_configs)
     if pdf_bytes:
         st.download_button(
             label="出走表をダウンロード（PDF）",
@@ -510,10 +570,7 @@ def show_race_schedule(participants: list[dict]) -> None:
     any_shown = False
     for event in event_fees:
         for cls in CLASS_ORDER:
-            rows = [
-                p for p in participants
-                if event in (p.get("events") or []) and p.get("dog_class") == cls
-            ]
+            rows = _rows_for_event_class(participants, event, cls, bar_height_map)
             if not rows:
                 continue
 
@@ -526,6 +583,7 @@ def show_race_schedule(participants: list[dict]) -> None:
                     "犬名": p["dog_name"],
                     "犬種": p["breed"],
                     "クラス": p["dog_class"],
+                    "バーダウン": _bar_down_display(p, event),
                 }
                 for i, p in enumerate(rows, start=1)
             ]
