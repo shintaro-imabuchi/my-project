@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCompetition, getLoginMessage } from "@/lib/competition";
 import { logout } from "@/app/logout/actions";
+import { UnpublishedNotice } from "@/components/UnpublishedNotice";
 
 // Streamlit版（pages/03_events.py）の「競技会・練習会などの一覧を見る」に
 // 相当するリンク先。公開開催情報一覧（静的サイト）へ誘導する。
@@ -17,6 +18,12 @@ export default async function HomePage() {
     getLoginMessage(),
   ]);
   const title = loginMessage || competition?.name || "参加登録システム";
+
+  // 非公開の間は、ログイン状態に関わらず準備中メッセージのみ表示する
+  // （次回大会の情報をapp_admin.pyで編集中、外部に見せたくない期間用）。
+  if (!competition?.is_published) {
+    return <UnpublishedNotice message={competition?.unpublished_message ?? null} />;
+  }
 
   if (!user) {
     return (

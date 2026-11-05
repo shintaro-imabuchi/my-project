@@ -15,7 +15,7 @@ export async function getCompetition(): Promise<Competition | null> {
   const { data } = await supabase
     .from("competitions")
     .select(
-      "id, name, event_fees, registration_open, guideline_url, top_image_url, notice_url, home_info_message",
+      "id, name, event_fees, registration_open, guideline_url, top_image_url, notice_url, home_info_message, is_published, unpublished_message",
     )
     .eq("id", getCompetitionId())
     .single();

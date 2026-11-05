@@ -57,6 +57,10 @@ export interface Competition {
   notice_url: string | null;
   /** ホーム画面に表示するお知らせ文 */
   home_info_message: string | null;
+  /** falseの間、参加登録アプリは全ページブロックされ準備中表示になる */
+  is_published: boolean;
+  /** 非公開時にトップへ表示する文言。nullならアプリ側のデフォルト文言を使う */
+  unpublished_message: string | null;
 }
 
 /** RPC get_registration_summary(p_competition_id) の戻り値 */
