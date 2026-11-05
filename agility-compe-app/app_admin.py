@@ -9,6 +9,10 @@ from supabase_client import get_supabase, get_competition_id, sign_in_as_owner
 from utils.settings import (
     get_registration_open,
     set_registration_open,
+    get_is_published,
+    set_is_published,
+    get_unpublished_message,
+    set_unpublished_message,
     get_event_fees,
     set_event_fees,
     get_login_message,
@@ -339,9 +343,51 @@ def show_home_info_message_settings() -> None:
         st.rerun()
 
 
+_DEFAULT_UNPUBLISHED_MESSAGE = "現在、参加登録を受け付けているイベントはありません。"
+
+
+def show_publish_settings() -> None:
+    """大会の公開/非公開設定UIを表示する。
+
+    非公開の間、参加登録アプリ（compe-entry）はログイン・新規登録を
+    含めて全ページがブロックされ、ここで設定した文言だけが表示される。
+    次回大会の情報をここで編集している間、外部に見えないようにするための項目。
+    """
+    st.markdown("#### 公開設定")
+    is_published = get_is_published()
+    if is_published:
+        st.success("現在「公開中」です。参加登録アプリに情報が表示されています。")
+    else:
+        st.warning("現在「非公開」です。参加登録アプリは準備中メッセージのみ表示されます。")
+
+    new_value = st.toggle("参加登録アプリに公開する", value=is_published, key="publish_toggle")
+    if new_value != is_published:
+        set_is_published(new_value)
+        st.success("公開を" + ("ONに" if new_value else "OFFに") + "しました。")
+        st.rerun()
+
+    st.caption("非公開の間に参加登録アプリのトップへ表示する文言（空欄ならデフォルト文言）")
+    current_msg = get_unpublished_message()
+    new_msg = st.text_area(
+        "非公開時のメッセージ",
+        value=current_msg or "",
+        placeholder=_DEFAULT_UNPUBLISHED_MESSAGE,
+        height=80,
+        key="unpublished_message_input",
+    )
+    if st.button("保存", type="primary", key="save_unpublished_message"):
+        set_unpublished_message(new_msg)
+        st.success("メッセージを保存しました。")
+        st.rerun()
+
+
 def show_admin_home() -> None:
     """管理者ホーム画面を表示する。"""
     st.subheader("管理者メニュー")
+
+    show_publish_settings()
+
+    st.divider()
 
     show_login_message_settings()
 

@@ -62,6 +62,74 @@ def set_registration_open(value: bool) -> None:
     ).eq("id", get_competition_id()).execute()
 
 
+def get_is_published() -> bool:
+    """この大会を参加登録アプリ（compe-entry）に公開しているかどうかを取得する。
+
+    registration_open（新規ユーザー登録の受付on/off）とは別の項目。
+    こちらは「大会の情報自体をそもそも外部に見せるか」を制御する、
+    より上位のフラグ。取得に失敗した場合はFalse（非公開）を返す
+    （情報を誤って公開してしまうより安全なデフォルト）。
+    """
+    try:
+        response = (
+            get_supabase()
+            .table("competitions")
+            .select("is_published")
+            .eq("id", get_competition_id())
+            .single()
+            .execute()
+        )
+        return bool(response.data["is_published"])
+    except Exception:
+        return False
+
+
+def set_is_published(value: bool) -> None:
+    """大会の公開状態をSupabaseに保存する。
+
+    Args:
+        value: Trueなら公開、Falseなら非公開（準備中）。
+    """
+    get_supabase().table("competitions").update(
+        {"is_published": value}
+    ).eq("id", get_competition_id()).execute()
+
+
+def get_unpublished_message() -> str | None:
+    """非公開時に参加登録アプリのトップに表示する文言をSupabaseから取得する。
+
+    未設定またはエラー時はNoneを返す（アプリ側のデフォルト文言を使う）。
+    """
+    try:
+        response = (
+            get_supabase()
+            .table("competitions")
+            .select("unpublished_message")
+            .eq("id", get_competition_id())
+            .single()
+            .execute()
+        )
+        val = response.data.get("unpublished_message")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+        return None
+    except Exception:
+        return None
+
+
+def set_unpublished_message(message: str | None) -> None:
+    """非公開時の表示文言をSupabaseに保存する。
+
+    Args:
+        message: 表示する文言。Noneまたは空文字列の場合はNullを保存する
+            （アプリ側のデフォルト文言にフォールバックする）。
+    """
+    value = message.strip() if message and message.strip() else None
+    get_supabase().table("competitions").update(
+        {"unpublished_message": value}
+    ).eq("id", get_competition_id()).execute()
+
+
 def get_event_fees() -> dict[str, int]:
     """競技種目と参加料金の対応辞書をSupabaseから取得する。
 
