@@ -3,4 +3,3 @@ supabase
 supabase_auth
 openpyxl
 reportlab
-anthropic
