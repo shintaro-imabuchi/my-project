@@ -480,10 +480,13 @@ def _rows_for_event_class(
 def generate_race_schedule_pdf(
     participants: list[dict], event_fees: dict[str, int], race_configs: list[dict]
 ) -> bytes | None:
-    """種目・クラス別出走表をPDF形式で生成してバイト列で返す。対象データなしの場合はNoneを返す。
+    """種目別出走表をPDF形式で生成してバイト列で返す。対象データなしの場合はNoneを返す。
 
     出走順は種目・クラスごとに、バーの高さの昇順（バーダウン希望があればその高さ、
     無ければ既定のバーの高さ）で決まる。
+
+    改ページは種目の境目のみで行い、同じ種目内のクラスの境目は空行（見出し＋余白）
+    で区切るだけにする（印刷して掲示する際の枚数を抑えるため）。
     """
     bar_height_map = _bar_height_map(race_configs)
     pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
@@ -496,6 +499,7 @@ def generate_race_schedule_pdf(
         topMargin=20 * mm, bottomMargin=20 * mm,
     )
     title_style = ParagraphStyle("title", fontName=FONT, fontSize=16, spaceAfter=6 * mm)
+    class_style = ParagraphStyle("class", fontName=FONT, fontSize=13, spaceBefore=6 * mm, spaceAfter=3 * mm)
     col_names = ["No.", "氏名", "犬名", "犬種", "クラス", "バーダウン"]
     col_widths = [15 * mm, 40 * mm, 40 * mm, 50 * mm, 18 * mm, 22 * mm]
     header_bg = colors.HexColor("#D9E1F2")
@@ -504,15 +508,26 @@ def generate_race_schedule_pdf(
     created = False
 
     for event in event_fees:
+        event_rows_by_class = {
+            cls: _rows_for_event_class(participants, event, cls, bar_height_map)
+            for cls in CLASS_ORDER
+        }
+        if not any(event_rows_by_class.values()):
+            continue
+
+        if created:
+            story.append(PageBreak())
+        story.append(Paragraph(f"{event}　出走表", title_style))
+
+        first_class_in_event = True
         for cls in CLASS_ORDER:
-            rows = _rows_for_event_class(participants, event, cls, bar_height_map)
+            rows = event_rows_by_class[cls]
             if not rows:
                 continue
 
-            if created:
-                story.append(PageBreak())
-
-            story.append(Paragraph(f"{event}　{cls}クラス　出走表", title_style))
+            if not first_class_in_event:
+                story.append(Spacer(1, 6 * mm))
+            story.append(Paragraph(f"{cls}クラス", class_style))
 
             table_data = [col_names] + [
                 [
@@ -535,6 +550,7 @@ def generate_race_schedule_pdf(
                 ("ALIGN", (4, 0), (5, -1), "CENTER"),
             ]))
             story.append(table)
+            first_class_in_event = False
             created = True
 
     if not created:
