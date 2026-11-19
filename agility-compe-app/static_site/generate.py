@@ -101,6 +101,18 @@ def get_seminars() -> dict[int, dict]:
     return {r["event_id"]: r for r in rows}
 
 
+def get_unlisted_seminar_events(seminars: dict[int, dict], listed_ids: set[int]) -> list[dict]:
+    """一覧に掲載しない（registration_open=false）が、セミナー設定のあるイベントを取得する。
+
+    限定公開のセミナー（URLを知っている人だけが申し込める）用。
+    申込ページは生成するが、一覧には出さず、検索エンジンにも載せない（noindex）。
+    """
+    ids = [eid for eid in seminars if eid not in listed_ids]
+    if not ids:
+        return []
+    return get_supabase().table("events").select("*").in_("id", ids).execute().data
+
+
 def _public_supabase_key() -> str:
     """申込ページに埋め込むSupabaseキーを返す。
 
@@ -210,12 +222,14 @@ def render_site(cards: list[dict]) -> str:
     )
 
 
-def render_seminar_pages(events: list[dict], seminars: dict[int, dict]) -> int:
+def render_seminar_pages(events: list[dict], seminars: dict[int, dict], unlisted: bool = False) -> int:
     """セミナー申込ページを dist/seminars/<event_id>/index.html に生成する。
 
     受付中フラグや定員はページ表示時にRPC（get_seminar_availability）で
     最新値を取得し、申込可否もRPC（submit_seminar_application）側で判定するため、
-    ここでは掲載中のセミナーすべてについてページを出力する。
+    ここでは対象のセミナーすべてについてページを出力する。
+
+    unlisted=True は限定公開（一覧非掲載）のセミナー。noindex を付け、一覧への戻るリンクを出さない。
     """
     env = Environment(
         loader=FileSystemLoader(os.path.join(_THIS_DIR, "templates")),
@@ -245,6 +259,9 @@ def render_seminar_pages(events: list[dict], seminars: dict[int, dict]) -> int:
             supabase_key=supabase_key,
             dog_classes=["S", "M", "IM", "L"],
             levels=["ビギナー", "1度", "2度", "3度"],
+            unlisted=unlisted,
+            opens_on=event.get("registration_opens_on"),
+            deadline=event.get("registration_deadline"),
         )
         with open(os.path.join(page_dir, "index.html"), "w", encoding="utf-8") as f:
             f.write(html)
@@ -276,8 +293,13 @@ def main() -> None:
         )
 
     seminar_count = render_seminar_pages(events, seminars)
+    unlisted_events = get_unlisted_seminar_events(seminars, {e["id"] for e in events})
+    unlisted_count = render_seminar_pages(unlisted_events, seminars, unlisted=True)
 
-    print(f"{len(cards)}件のイベントを出力しました（セミナー申込ページ{seminar_count}件）")
+    print(
+        f"{len(cards)}件のイベントを出力しました"
+        f"（セミナー申込ページ: 一覧掲載{seminar_count}件・限定公開{unlisted_count}件）"
+    )
 
 
 if __name__ == "__main__":

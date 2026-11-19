@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ name }} 申込フォーム | 犬のアジリティー 開催情報一覧</title>
 <meta name="description" content="{{ name }}（{{ date_range }}{% if venue %}・{{ venue }}{% endif %}）の参加申込フォームです。">
-<link rel="canonical" href="{{ page_url }}">
+{% if unlisted %}<meta name="robots" content="noindex, nofollow">{% else %}<link rel="canonical" href="{{ page_url }}">{% endif %}
 <link rel="stylesheet" href="../../static/style.css">
 </head>
 <body>
 <div class="page">
-  <p class="back-link"><a href="../../">← 開催情報一覧に戻る</a></p>
+  {% if not unlisted %}<p class="back-link"><a href="../../">← 開催情報一覧に戻る</a></p>{% endif %}
 
   <header class="page-header">
     <h1 class="seminar-title">{{ name }}</h1>
@@ -22,7 +22,7 @@
     {% if guideline_url %}
     <a class="btn btn-outline" href="{{ guideline_url }}" target="_blank" rel="noopener">開催要項を見る</a>
     {% endif %}
-    {% if notes %}<p class="caption">{{ notes }}</p>{% endif %}
+    {% if notes %}<p class="seminar-description">{{ notes }}</p>{% endif %}
   </header>
 
   <section id="availability" class="availability" aria-live="polite">
@@ -34,6 +34,8 @@
   {% else %}
   <form id="seminar-form" class="seminar-form" novalidate
         data-event-id="{{ event_id }}"
+        data-opens-on="{{ opens_on or '' }}"
+        data-deadline="{{ deadline or '' }}"
         data-supabase-url="{{ supabase_url }}"
         data-supabase-key="{{ supabase_key }}">
 

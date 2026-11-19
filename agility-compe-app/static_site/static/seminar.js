@@ -41,8 +41,42 @@
     el.textContent = text;
   }
 
+  // ---- 申込期間（日本時間の日付で判定。最終判定はRPC側で行う） ----
+  function todayJst() {
+    const d = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function formatDate(iso) {
+    const p = iso.split("-");
+    return Number(p[0]) + "/" + Number(p[1]) + "/" + Number(p[2]);
+  }
+
+  function periodMessage() {
+    const today = todayJst();
+    const opensOn = form.dataset.opensOn;
+    const deadline = form.dataset.deadline;
+    if (opensOn && today < opensOn) {
+      return "申込受付は " + formatDate(opensOn) + " から開始します。";
+    }
+    if (deadline && today > deadline) {
+      return "申込の受付は終了しました。";
+    }
+    return null;
+  }
+
   // ---- 残り枠 ----
   function showAvailability() {
+    const outOfPeriod = periodMessage();
+    if (outOfPeriod) {
+      availability.innerHTML = "";
+      const p = document.createElement("p");
+      p.className = "status-label status-caption";
+      setText(p, outOfPeriod);
+      availability.appendChild(p);
+      form.hidden = true;
+      return;
+    }
     rpc("get_seminar_availability", { p_event_id: eventId })
       .then(function (a) {
         availability.innerHTML = "";

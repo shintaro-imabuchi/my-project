@@ -363,3 +363,9 @@ button.btn:disabled {
 [hidden] {
   display: none !important;
 }
+
+.seminar-description {
+  white-space: pre-line;
+  margin: 12px 0 0;
+  font-size: 0.95rem;
+}
