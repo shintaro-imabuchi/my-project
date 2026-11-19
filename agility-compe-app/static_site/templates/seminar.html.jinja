@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ name }} 申込フォーム | 犬のアジリティー 開催情報一覧</title>
+<meta name="description" content="{{ name }}（{{ date_range }}{% if venue %}・{{ venue }}{% endif %}）の参加申込フォームです。">
+<link rel="canonical" href="{{ page_url }}">
+<link rel="stylesheet" href="../../static/style.css">
+</head>
+<body>
+<div class="page">
+  <p class="back-link"><a href="../../">← 開催情報一覧に戻る</a></p>
+
+  <header class="page-header">
+    <h1 class="seminar-title">{{ name }}</h1>
+    <p class="event-info">
+      開催日: {{ date_range }}
+      {% if venue %}<br>会場: {{ venue }}{% endif %}
+      {% if registration_period %}<br>申込期間: {{ registration_period }}{% endif %}
+    </p>
+    {% if guideline_url %}
+    <a class="btn btn-outline" href="{{ guideline_url }}" target="_blank" rel="noopener">開催要項を見る</a>
+    {% endif %}
+    {% if notes %}<p class="caption">{{ notes }}</p>{% endif %}
+  </header>
+
+  <section id="availability" class="availability" aria-live="polite">
+    <p class="caption">残り枠を確認しています…</p>
+  </section>
+
+  {% if is_cancelled %}
+  <p class="status-label status-error">このセミナーは開催中止になりました。</p>
+  {% else %}
+  <form id="seminar-form" class="seminar-form" novalidate
+        data-event-id="{{ event_id }}"
+        data-supabase-url="{{ supabase_url }}"
+        data-supabase-key="{{ supabase_key }}">
+
+    <fieldset class="form-section">
+      <legend>申込者</legend>
+      <label class="field">
+        <span class="field-label">氏名 <span class="required">必須</span></span>
+        <input type="text" name="name" maxlength="50" autocomplete="name" required>
+      </label>
+      <label class="field">
+        <span class="field-label">メールアドレス <span class="required">必須</span></span>
+        <input type="email" name="email" maxlength="254" autocomplete="email" inputmode="email" required>
+      </label>
+      <label class="field">
+        <span class="field-label">電話番号</span>
+        <input type="tel" name="phone" maxlength="20" autocomplete="tel" inputmode="tel">
+      </label>
+      <label class="field">
+        <span class="field-label">備考・ご質問</span>
+        <textarea name="note" maxlength="1000" rows="3"></textarea>
+      </label>
+      <!-- ボット対策（人間には表示されない欄。入力しないでください） -->
+      <label class="hp-field" aria-hidden="true">
+        ウェブサイト
+        <input type="text" name="website" tabindex="-1" autocomplete="off">
+      </label>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>参加する犬（最大5頭）</legend>
+      <div id="dog-list"></div>
+      <button type="button" id="add-dog" class="btn btn-outline">＋ 犬を追加</button>
+    </fieldset>
+
+    <template id="dog-template">
+      <div class="dog-row">
+        <div class="dog-row-header">
+          <span class="dog-row-title"></span>
+          <button type="button" class="remove-dog link-button">削除</button>
+        </div>
+        <label class="field">
+          <span class="field-label">犬の名前 <span class="required">必須</span></span>
+          <input type="text" class="dog-name" maxlength="50" required>
+        </label>
+        <label class="field">
+          <span class="field-label">犬種</span>
+          <input type="text" class="dog-breed" maxlength="50">
+        </label>
+        <label class="field">
+          <span class="field-label">クラス <span class="required">必須</span></span>
+          <select class="dog-class" required>
+            <option value="">選択してください</option>
+            {% for c in dog_classes %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">現在の競技レベル <span class="required">必須</span></span>
+          <select class="dog-level" required>
+            <option value="">選択してください</option>
+            {% for l in levels %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+    </template>
+
+    <p class="privacy caption">
+      ご入力いただいた個人情報は、本セミナーの運営に関するご連絡にのみ使用し、それ以外の目的には使用しません。
+    </p>
+
+    <p id="form-error" class="form-error" role="alert" hidden></p>
+    <button type="submit" id="submit-button" class="btn">申し込む</button>
+  </form>
+
+  <section id="result" class="result" hidden aria-live="polite"></section>
+  {% endif %}
+</div>
+<script src="../../static/seminar.js"></script>
+</body>
+</html>

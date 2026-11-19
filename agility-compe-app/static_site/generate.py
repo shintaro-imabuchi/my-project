@@ -10,6 +10,8 @@ app_events_public.pyの表示ロジックを踏襲しているが、当スクリ
 クライアントサイドで切り替える。
 """
 
+import base64
+import json
 import os
 import shutil
 import sys
@@ -83,6 +85,44 @@ def get_published_events() -> list[dict]:
     )
 
 
+def get_seminars() -> dict[int, dict]:
+    """セミナー申込の設定（定員・受付中フラグ）を events.id をキーにして取得する。"""
+    try:
+        rows = (
+            get_supabase()
+            .table("seminars")
+            .select("event_id, capacity, accepting")
+            .execute()
+            .data
+        )
+    except Exception as e:  # noqa: BLE001 - テーブル未作成でも一覧の生成は続ける
+        print(f"警告: seminarsテーブルを読めませんでした（申込ページは生成しません）: {e}")
+        return {}
+    return {r["event_id"]: r for r in rows}
+
+
+def _public_supabase_key() -> str:
+    """申込ページに埋め込むSupabaseキーを返す。
+
+    ブラウザに露出するため、anon（公開用）キーであることを確認してから使う。
+    service_role キーが誤って設定されていた場合はビルドを止める。
+    """
+    key = os.environ["SUPABASE_KEY"]
+    if key.startswith("sb_publishable_"):
+        return key
+    if key.startswith("sb_secret_"):
+        sys.exit("SUPABASE_KEYに秘密鍵（sb_secret_）が設定されています。公開ページに埋め込めません")
+    try:
+        payload = key.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        role = json.loads(base64.urlsafe_b64decode(payload)).get("role")
+    except (IndexError, ValueError):
+        sys.exit("SUPABASE_KEYの形式を判別できません")
+    if role != "anon":
+        sys.exit(f"SUPABASE_KEYのroleが{role}です。anonキー以外は公開ページに埋め込めません")
+    return key
+
+
 def _format_date(iso_str: str) -> str:
     """ISO形式の日付文字列を表示用文字列にする。"""
     d = date.fromisoformat(iso_str)
@@ -120,8 +160,11 @@ def _sort_by_proximity(events: list[dict]) -> list[dict]:
     return upcoming + past
 
 
-def build_card(event: dict) -> dict:
-    """1件のイベントを、テンプレートに渡す表示用データに変換する。"""
+def build_card(event: dict, seminar: dict | None = None) -> dict:
+    """1件のイベントを、テンプレートに渡す表示用データに変換する。
+
+    seminar はセミナー申込の設定（受付中ならカードに申込ボタンを出す）。
+    """
     status_kind, status_label = get_event_status(event)
     guideline_url = event.get("guideline_url")
     registration_url = event.get("registration_url")
@@ -140,6 +183,11 @@ def build_card(event: dict) -> dict:
         "no_url": not guideline_url and not registration_url,
         "registration_note": event.get("registration_note"),
         "notes": event.get("notes"),
+        "seminar_url": (
+            f"seminars/{event['id']}/"
+            if seminar and seminar["accepting"] and not event.get("is_cancelled")
+            else None
+        ),
     }
 
 
@@ -162,10 +210,53 @@ def render_site(cards: list[dict]) -> str:
     )
 
 
+def render_seminar_pages(events: list[dict], seminars: dict[int, dict]) -> int:
+    """セミナー申込ページを dist/seminars/<event_id>/index.html に生成する。
+
+    受付中フラグや定員はページ表示時にRPC（get_seminar_availability）で
+    最新値を取得し、申込可否もRPC（submit_seminar_application）側で判定するため、
+    ここでは掲載中のセミナーすべてについてページを出力する。
+    """
+    env = Environment(
+        loader=FileSystemLoader(os.path.join(_THIS_DIR, "templates")),
+        autoescape=True,
+    )
+    template = env.get_template("seminar.html.jinja")
+    supabase_url = os.environ["SUPABASE_URL"].strip().strip('"')
+    supabase_key = _public_supabase_key()
+    count = 0
+    for event in events:
+        if event["id"] not in seminars:
+            continue
+        page_dir = os.path.join(_DIST_DIR, "seminars", str(event["id"]))
+        os.makedirs(page_dir, exist_ok=True)
+        html = template.render(
+            event_id=event["id"],
+            name=event["name"],
+            is_cancelled=bool(event.get("is_cancelled")),
+            date_range=_format_date_range(event),
+            venue=event.get("venue"),
+            registration_period=_format_registration_period(event),
+            guideline_url=event.get("guideline_url"),
+            notes=event.get("notes"),
+            site_url=_SITE_URL,
+            page_url=f"{_SITE_URL}seminars/{event['id']}/",
+            supabase_url=supabase_url,
+            supabase_key=supabase_key,
+            dog_classes=["S", "M", "IM", "L"],
+            levels=["ビギナー", "1度", "2度", "3度"],
+        )
+        with open(os.path.join(page_dir, "index.html"), "w", encoding="utf-8") as f:
+            f.write(html)
+        count += 1
+    return count
+
+
 def main() -> None:
     """開催情報一覧の静的サイトをdist/に生成する。"""
     events = get_published_events()
-    cards = [build_card(e) for e in _sort_by_proximity(events)]
+    seminars = get_seminars()
+    cards = [build_card(e, seminars.get(e["id"])) for e in _sort_by_proximity(events)]
     cards = [c for c in cards if c["status_label"] not in _EXCLUDED_STATUS_LABELS]
 
     os.makedirs(_DIST_DIR, exist_ok=True)
@@ -178,13 +269,15 @@ def main() -> None:
 
     dist_static_dir = os.path.join(_DIST_DIR, "static")
     os.makedirs(dist_static_dir, exist_ok=True)
-    for filename in ("style.css", "filter.js"):
+    for filename in ("style.css", "filter.js", "seminar.js"):
         shutil.copyfile(
             os.path.join(_THIS_DIR, "static", filename),
             os.path.join(dist_static_dir, filename),
         )
 
-    print(f"{len(cards)}件のイベントを出力しました")
+    seminar_count = render_seminar_pages(events, seminars)
+
+    print(f"{len(cards)}件のイベントを出力しました（セミナー申込ページ{seminar_count}件）")
 
 
 if __name__ == "__main__":

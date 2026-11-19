@@ -63,11 +63,14 @@
       {% if card.guideline_url %}
       <a class="btn" href="{{ card.guideline_url }}" target="_blank" rel="noopener">開催要項を見る</a>
       {% endif %}
+      {% if card.seminar_url %}
+      <a class="btn btn-apply" href="{{ card.seminar_url }}">このセミナーに申し込む</a>
+      {% endif %}
       {% if card.registration_url %}
       <a class="btn" href="{{ card.registration_url }}" target="_blank" rel="noopener">参加登録はこちら</a>
       <p class="caption">※別サイトに移動します。</p>
       {% endif %}
-      {% if card.no_url %}
+      {% if card.no_url and not card.seminar_url %}
       <p class="caption">詳細・申込方法は主催者にお問い合わせください。</p>
       {% endif %}
       {% if card.registration_note or card.notes %}
