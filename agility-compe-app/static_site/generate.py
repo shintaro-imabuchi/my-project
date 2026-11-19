@@ -249,6 +249,7 @@ def render_seminar_pages(events: list[dict], seminars: dict[int, dict], unlisted
             name=event["name"],
             is_cancelled=bool(event.get("is_cancelled")),
             date_range=_format_date_range(event),
+            event_time=event.get("event_time"),
             venue=event.get("venue"),
             registration_period=_format_registration_period(event),
             guideline_url=event.get("guideline_url"),

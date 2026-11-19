@@ -16,6 +16,7 @@
     <h1 class="seminar-title">{{ name }}</h1>
     <p class="event-info">
       開催日: {{ date_range }}
+      {% if event_time %}<br>予定時間: {{ event_time }}{% endif %}
       {% if venue %}<br>会場: {{ venue }}{% endif %}
       {% if registration_period %}<br>申込期間: {{ registration_period }}{% endif %}
     </p>
