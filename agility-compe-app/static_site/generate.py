@@ -141,6 +141,24 @@ def _format_date(iso_str: str) -> str:
     return f"{d.year}/{d.month}/{d.day}"
 
 
+_WEEKDAYS_JA = "月火水木金土日"
+
+
+def _format_date_with_weekday(iso_str: str) -> str:
+    """ISO形式の日付文字列を「2027/1/17日曜」の形にする（セミナー申込ページ用）。"""
+    d = date.fromisoformat(iso_str)
+    return f"{d.year}/{d.month}/{d.day}{_WEEKDAYS_JA[d.weekday()]}曜"
+
+
+def _format_date_range_with_weekday(event: dict) -> str:
+    """開催日〜終了日を曜日付きの表示用文字列にする（セミナー申込ページ用）。"""
+    text = _format_date_with_weekday(event["event_date"])
+    end_raw = event.get("event_end_date")
+    if end_raw and end_raw != event["event_date"]:
+        text += f" 〜 {_format_date_with_weekday(end_raw)}"
+    return text
+
+
 def _format_date_range(event: dict) -> str:
     """開催日〜終了日を表示用文字列にする。"""
     text = _format_date(event["event_date"])
@@ -248,8 +266,9 @@ def render_seminar_pages(events: list[dict], seminars: dict[int, dict], unlisted
             event_id=event["id"],
             name=event["name"],
             is_cancelled=bool(event.get("is_cancelled")),
-            date_range=_format_date_range(event),
+            date_range=_format_date_range_with_weekday(event),
             event_time=event.get("event_time"),
+            instructor=event.get("instructor"),
             venue=event.get("venue"),
             registration_period=_format_registration_period(event),
             guideline_url=event.get("guideline_url"),

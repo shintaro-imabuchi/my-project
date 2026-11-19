@@ -15,6 +15,7 @@
   <header class="page-header">
     <h1 class="seminar-title">{{ name }}</h1>
     <p class="event-info">
+      {% if instructor %}講師: {{ instructor }}<br>{% endif %}
       開催日: {{ date_range }}
       {% if event_time %}<br>予定時間: {{ event_time }}{% endif %}
       {% if venue %}<br>会場: {{ venue }}{% endif %}
