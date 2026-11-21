@@ -11,7 +11,7 @@
     return;
   }
 
-  const MAX_DOGS = 5;
+  const MAX_DOGS = 2;
   const eventId = Number(form.dataset.eventId);
   const baseUrl = form.dataset.supabaseUrl.replace(/\/+$/, "");
   const apiKey = form.dataset.supabaseKey;

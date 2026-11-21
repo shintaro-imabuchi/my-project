@@ -129,6 +129,7 @@ REVOKE ALL ON public.seminar_application_dogs FROM anon;
 --   * seminars 行を FOR UPDATE でロックし、同時申込でも定員を超えないようにする
 --   * 残り枠が足りない場合は申込全体をキャンセル待ちにする
 --   * すでにキャンセル待ちがいる場合は、順番を守るため新規申込もキャンセル待ちにする
+--   * 1申込あたりの犬は最大2頭（2026-11-22 に5頭から変更）
 --   * p_website はボット対策のハニーポット（人間には見えない欄）。値があれば保存せず成功を装う
 -- ------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.submit_seminar_application(
@@ -196,7 +197,7 @@ BEGIN
         RETURN json_build_object('error', 'invalid', 'field', 'note');
     END IF;
     IF p_dogs IS NULL OR jsonb_typeof(p_dogs) <> 'array'
-       OR jsonb_array_length(p_dogs) NOT BETWEEN 1 AND 5 THEN
+       OR jsonb_array_length(p_dogs) NOT BETWEEN 1 AND 2 THEN
         RETURN json_build_object('error', 'invalid', 'field', 'dogs');
     END IF;
     FOR v_dog IN SELECT value FROM jsonb_array_elements(p_dogs) LOOP
