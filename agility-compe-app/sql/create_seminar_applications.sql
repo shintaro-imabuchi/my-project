@@ -43,7 +43,9 @@ CREATE TABLE IF NOT EXISTS public.seminars (
     event_id    bigint  NOT NULL UNIQUE REFERENCES public.events(id) ON DELETE CASCADE,
     capacity    integer NOT NULL CHECK (capacity > 0),
     accepting   boolean NOT NULL DEFAULT false,
-    created_at  timestamptz NOT NULL DEFAULT now()
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    -- キャンセル待ちの上限件数。達したら submit_seminar_application が accepting=false にする（NULL=上限なし）
+    waitlist_limit integer CHECK (waitlist_limit >= 1)
 );
 
 ALTER TABLE public.seminars ENABLE ROW LEVEL SECURITY;
@@ -129,6 +131,7 @@ REVOKE ALL ON public.seminar_application_dogs FROM anon;
 --   * seminars 行を FOR UPDATE でロックし、同時申込でも定員を超えないようにする
 --   * 残り枠が足りない場合は申込全体をキャンセル待ちにする
 --   * すでにキャンセル待ちがいる場合は、順番を守るため新規申込もキャンセル待ちにする
+--   * キャンセル待ちが seminars.waitlist_limit 件に達したら受付を自動停止（accepting=false）
 --   * 1申込あたりの犬は最大2頭（2026-11-22 に5頭から変更）
 --   * p_website はボット対策のハニーポット（人間には見えない欄）。値があれば保存せず成功を装う
 -- ------------------------------------------------------------
@@ -255,6 +258,10 @@ BEGIN
         SELECT count(*) INTO v_position
         FROM public.seminar_applications
         WHERE seminar_id = v_seminar.id AND status = 'waitlist';
+        -- キャンセル待ちが上限に達したら受付を自動停止する（2026-11-24 追加）
+        IF v_seminar.waitlist_limit IS NOT NULL AND v_position >= v_seminar.waitlist_limit THEN
+            UPDATE public.seminars SET accepting = false WHERE id = v_seminar.id;
+        END IF;
     END IF;
 
     RETURN json_build_object('status', v_status, 'waitlist_position', v_position);
